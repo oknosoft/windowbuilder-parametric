@@ -16,13 +16,12 @@ module.exports = gulp;
 
 
 // Cборка библиотеки рисовалки для report_server
-gulp.task('windowbuilder-lib', function(){
+gulp.task('service', function(){
   return gulp.src([
-    './src/builder/import.js',
-    './src/geometry/*.js',
-    './src/builder/export.js',
+    './src/get.js',
+    './src/post.js',
   ])
-    .pipe(concat('windowbuilder.js'))
+    .pipe(concat('service.js'))
     .pipe(gulp.dest('./server'))
 
 });

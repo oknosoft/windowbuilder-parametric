@@ -6,7 +6,7 @@ const Koa = require('koa');
 const app = new Koa();
 
 // Register the router as Koa middleware
-const rep = require('./server/router');
+const rep = require('./src/router');
 app.use(rep.middleware());
 
 app.listen(process.env.PORT || 3000);
