@@ -15,17 +15,6 @@ const gulp = require('gulp'),
 module.exports = gulp;
 
 
-// Cборка библиотеки рисовалки для report_server
-gulp.task('service', function(){
-  return gulp.src([
-    './src/get.js',
-    './src/post.js',
-  ])
-    .pipe(concat('service.js'))
-    .pipe(gulp.dest('./server'))
-
-});
-
 // Cборка модификаторов для report_server
 gulp.task('modifiers', function(){
   return gulp.src([
@@ -33,7 +22,7 @@ gulp.task('modifiers', function(){
     './src/modifiers/catalogs/*.js',
     './src/modifiers/charts_characteristics/*.js',
     './src/modifiers/dataprocessors/*.js',
-    './src/modifiers/documents/doc_calc_order.js',
+    './src/modifiers/documents/*.js',
   ])
     .pipe(concat('modifiers.js'))
     .pipe(wrap({ src: './server/metadata/modifiers.txt'}))
