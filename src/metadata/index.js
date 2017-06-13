@@ -64,6 +64,7 @@ $p.eve = {
 
   // загружаем кешируемые справочники в ram
   await $p.adapters.pouch.log_in(user_node.username, user_node.password);
+  $p.md.emit('pouch_load_data_loaded', []);
   debug('logged in');
 
 })();

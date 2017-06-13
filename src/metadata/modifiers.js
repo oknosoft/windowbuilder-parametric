@@ -323,7 +323,7 @@ $p.on({
 
 	// загружаем в ОЗУ обычные характеристики (без ссылок на заказы)
 	predefined_elmnts_inited: function common_characteristics() {
-		$p.off(common_characteristics);
+		$p.off('predefined_elmnts_inited', common_characteristics);
 		return $p.cat.characteristics.pouch_load_view("doc/nom_characteristics");
 	}
 
@@ -1737,7 +1737,7 @@ $p.on({
   // обработчик события после загрузки данных в озу
 	pouch_load_data_loaded: function cat_formulas_data_loaded () {
 
-		$p.off(cat_formulas_data_loaded);
+    $p.off('pouch_load_data_loaded', cat_formulas_data_loaded);
 
 		// читаем элементы из pouchdb и создаём формулы
 		$p.cat.formulas.pouch_find_rows({ _top: 500, _skip: 0 })
@@ -3293,7 +3293,7 @@ $p.CatUsers.prototype.__define({
 	$p.on({
 		pouch_load_data_loaded: function predefined_elmnts_data_loaded() {
 
-			$p.off(predefined_elmnts_data_loaded);
+			$p.off('pouch_load_data_loaded', predefined_elmnts_data_loaded);
 
 			// читаем элементы из pouchdb и создаём свойства
 			$p.cch.predefined_elmnts.pouch_find_rows({_raw: true, _top: 500, _skip: 0})

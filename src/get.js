@@ -13,27 +13,48 @@ async function calc_order(ctx, next) {
   //ctx.body = res;
 }
 
-async function clrs(ctx, next) {
+async function cat(ctx, next) {
+
   const predefined_names = ['БезЦвета', 'Белый'];
-  ctx.body = $p.cat.clrs.alatable
-    .filter((o) => !o.is_folder && (!o.predefined_name || predefined_names.indexOf(o.predefined_name) != -1))
-    .map((o) => ({
+  const {clrs, inserts, nom} = $p.cat;
+  const res = {
+    clrs: clrs.alatable
+      .filter((o) => !o.is_folder && (!o.predefined_name || predefined_names.indexOf(o.predefined_name) != -1))
+      .map((o) => ({
+        ref: o.ref,
+        id: o.id.pad(3),
+        name: o.name,
+      })),
+    inserts: inserts.alatable.map((o) => ({
       ref: o.ref,
-      id: o.id.pad(3),
       name: o.name,
-    }));
+    })),
+    nom: []
+  };
+
+  const {goods} = $p.job_prm.nom;
+  nom.forEach((o) => {
+    if(o.is_folder){
+      return;
+    }
+    for(let good of goods){
+      if(o._hierarchy(good)){
+        res.nom.push({
+          ref: o.ref,
+          id: o.id,
+          name: o.name,
+          article: o.article,
+        });
+        break;
+      }
+    }
+  });
+  ctx.body = res;
 }
 
 async function nom(ctx, next) {
-  const predefined_names = ['БезЦвета', 'Белый'];
-  ctx.body = $p.cat.clrs.alatable.filter((o) => !o.predefined_name || predefined_names.indexOf(o.predefined_name) != -1);
-}
 
-async function inserts(ctx, next) {
-  ctx.body = $p.cat.inserts.alatable.map((o) => ({
-      ref: o.ref,
-      name: o.name,
-  }));
+  ctx.body = $p.cat.nom.alatable.filter((o) => !o.predefined_name || predefined_names.indexOf(o.predefined_name) != -1);
 }
 
 // формирует json описания продукций массива заказов
@@ -54,12 +75,8 @@ module.exports = async (ctx, next) => {
     switch (ctx.params.class){
       case 'doc.calc_order':
         return await calc_order(ctx, next);
-      case 'cat.clrs':
-        return await clrs(ctx, next);
-      case 'cat.inserts':
-        return await inserts(ctx, next);
-      case 'cat.nom':
-        return await nom(ctx, next);
+      case 'cat':
+        return await cat(ctx, next);
       case 'array':
         return await array(ctx, next);
     }
