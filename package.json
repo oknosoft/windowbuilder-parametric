@@ -10,7 +10,7 @@
     "npm": "^4.2"
   },
   "scripts": {
-    "prebuild:meta": "node ./server/metadata/prebuild",
+    "prebuild:meta": "node ./src/metadata/prebuild",
     "start": "node ./index"
   },
   "dependencies": {

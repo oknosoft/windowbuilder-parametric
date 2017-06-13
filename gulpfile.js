@@ -25,8 +25,8 @@ gulp.task('modifiers', function(){
     './src/modifiers/documents/*.js',
   ])
     .pipe(concat('modifiers.js'))
-    .pipe(wrap({ src: './server/metadata/modifiers.txt'}))
-    .pipe(gulp.dest('./server/metadata'))
+    .pipe(wrap({ src: './src/metadata/modifiers.txt'}))
+    .pipe(gulp.dest('./src/metadata'))
 
 });
 

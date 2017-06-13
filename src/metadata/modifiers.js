@@ -4988,5 +4988,1179 @@ $p.doc.calc_order.on({
 })();
 
 
+/**
+ * форма списка документов Расчет-заказ. публикуемый метод: doc.calc_order.form_list(o, pwnd, attr)
+ *
+ * &copy; Evgeniy Malyarov http://www.oknosoft.ru 2014-2017
+ *
+ * @module doc_calc_order_form_list
+ */
+
+
+$p.doc.calc_order.form_list = function(pwnd, attr){
+
+	if(!attr){
+		attr = {
+			hide_header: true,
+			date_from: new Date((new Date()).getFullYear().toFixed() + "-01-01"),
+			date_till: new Date((new Date()).getFullYear().toFixed() + "-12-31"),
+			on_new: (o) => {
+				$p.iface.set_hash(this.class_name, o.ref, "doc");
+			},
+			on_edit: (_mgr, rId) => {
+				$p.iface.set_hash(_mgr.class_name, rId, "doc");
+			}
+		};
+	}
+
+	// разбивка на 2 колонки - дерево и карусель
+	const layout = pwnd.attachLayout({
+			pattern: "2U",
+			cells: [{
+				id: "a",
+				text: "Фильтр",
+				collapsed_text: "Фильтр",
+				width: 180
+			}, {
+				id: "b",
+				text: "Заказы",
+				header: false
+			}],
+			offsets: { top: 0, right: 0, bottom: 0, left: 0}
+		});
+
+	const tree = layout.cells("a").attachTreeView({
+			iconset: "font_awesome"
+		});
+
+  return this.pouch_db.getIndexes()
+    .then(({indexes}) => {
+      attr._index = {
+        ddoc: "mango_calc_order",
+        fields: ["department", "state", "date", "search"],
+        name: 'list',
+        type: 'json',
+      };
+      if(!indexes.some(({ddoc}) => ddoc && ddoc.indexOf(attr._index.ddoc) != -1)){
+        return this.pouch_db.createIndex(attr._index);
+      }
+    })
+    .then(() => {
+      return new Promise((resolve, reject) => {
+
+        attr.on_create = (wnd) => {
+
+          const {elmnts} = wnd;
+
+          // добавляем отбор по подразделению
+          const dp = $p.dp.builder_price.create();
+          const pos = elmnts.toolbar.getPosition("input_filter");
+          const txt_id = `txt_${dhx4.newId()}`;
+          elmnts.toolbar.addText(txt_id, pos, "");
+          const txt_div = elmnts.toolbar.objPull[elmnts.toolbar.idPrefix + txt_id].obj;
+          const dep = new $p.iface.OCombo({
+            parent: txt_div,
+            obj: dp,
+            field: "department",
+            width: 180,
+            hide_frm: true,
+          });
+          txt_div.style.border = "1px solid #ccc";
+          txt_div.style.borderRadius = "3px";
+          txt_div.style.padding = "3px 2px 1px 2px";
+          txt_div.style.margin = "1px 5px 1px 1px";
+          dep.DOMelem_input.placeholder = "Подразделение";
+
+          Object.observe(dp, (changes) => {
+            changes.forEach((change) => {
+              if(change.name == "department"){
+                elmnts.filter.call_event();
+                $p.wsql.set_user_param("current_department", dp.department.ref);
+              }
+            });
+          });
+
+          const set_department = $p.DocCalc_order.set_department.bind(dp);
+          set_department();
+          if(!$p.wsql.get_user_param('couch_direct')){
+            $p.on({user_log_in: set_department});
+          }
+
+          // настраиваем фильтр для списка заказов
+          elmnts.filter.custom_selection.__define({
+            department: {
+              get: function () {
+                const {department} = dp;
+                const state = (tree && tree.getSelectedId()) || 'draft';
+                return state == 'template' ? {$eq: $p.utils.blank.guid} : {$eq: department.ref};
+                // const depts = [];
+                // $p.cat.divisions.forEach((o) =>{
+                //   if(o._hierarchy(department)){
+                //     depts.push(o.ref)
+                //   }
+                // });
+                // return depts.length == 1 ?  {$eq: depts[0]} : {$in: depts};
+              },
+              enumerable: true
+            },
+            state: {
+              get: function(){
+                const state = (tree && tree.getSelectedId()) || 'draft';
+                return state == 'all' ? {$in: 'draft,sent,confirmed,declined,service,complaints,template,zarchive'.split(',')} : {$eq: state};
+              },
+              enumerable: true
+            }
+          });
+          elmnts.filter.custom_selection._index = attr._index;
+
+          // картинка заказа в статусбаре
+          elmnts.status_bar = wnd.attachStatusBar();
+          elmnts.svgs = new $p.iface.OSvgs(wnd, elmnts.status_bar,
+            (ref, dbl) => dbl && $p.iface.set_hash("cat.characteristics", ref, "builder"));
+          elmnts.grid.attachEvent("onRowSelect", (rid) => elmnts.svgs.reload(rid));
+
+          // настраиваем дерево
+          tree.loadStruct($p.injected_data["tree_filteres.xml"]);
+          tree.attachEvent("onSelect", (rid, mode) => mode && elmnts.filter.call_event());
+
+          resolve(wnd);
+        }
+
+        this.mango_selection(layout.cells("b"), attr);
+
+      });
+    });
+
+};
+
+
+/**
+ * форма документа Расчет-заказ. публикуемый метод: doc.calc_order.form_obj(o, pwnd, attr)
+ *
+ * &copy; Evgeniy Malyarov http://www.oknosoft.ru 2014-2017
+ *
+ * @module doc_calc_order_form_obj
+ */
+
+(function($p){
+
+	const _mgr = $p.doc.calc_order;
+	let _meta_patched;
+
+
+	_mgr.form_obj = function(pwnd, attr){
+
+		let o, wnd, evts = [], attr_on_close = attr.on_close;
+
+		/**
+		 * структура заголовков табчасти продукции
+		 * @param source
+		 */
+		if(!_meta_patched){
+			(function(source){
+				// TODO: штуки сейчас спрятаны в ro и имеют нулевую ширину
+				if($p.wsql.get_user_param("hide_price_dealer")){
+					source.headers = "№,Номенклатура,Характеристика,Комментарий,Штук,Длина,Высота,Площадь,Колич.,Ед,Скидка,Цена,Сумма,Скидка&nbsp;дил,Цена&nbsp;дил,Сумма&nbsp;дил";
+					source.widths = "40,200,*,220,0,70,70,70,70,40,70,70,70,0,0,0";
+					source.min_widths = "30,200,220,150,0,70,40,70,70,70,70,70,70,0,0,0";
+
+				}else if($p.wsql.get_user_param("hide_price_manufacturer")){
+					source.headers = "№,Номенклатура,Характеристика,Комментарий,Штук,Длина,Высота,Площадь,Колич.,Ед,Скидка&nbsp;пост,Цена&nbsp;пост,Сумма&nbsp;пост,Скидка,Цена,Сумма";
+					source.widths = "40,200,*,220,0,70,70,70,70,40,0,0,0,70,70,70";
+					source.min_widths = "30,200,220,150,0,70,40,70,70,70,0,0,0,70,70,70";
+
+				}else{
+					source.headers = "№,Номенклатура,Характеристика,Комментарий,Штук,Длина,Высота,Площадь,Колич.,Ед,Скидка&nbsp;пост,Цена&nbsp;пост,Сумма&nbsp;пост,Скидка&nbsp;дил,Цена&nbsp;дил,Сумма&nbsp;дил";
+					source.widths = "40,200,*,220,0,70,70,70,70,40,70,70,70,70,70,70";
+					source.min_widths = "30,200,220,150,0,70,40,70,70,70,70,70,70,70,70,70";
+				}
+
+				if($p.current_user.role_available("СогласованиеРасчетовЗаказов") || $p.current_user.role_available("РедактированиеСкидок"))
+					source.types = "cntr,ref,ref,txt,ro,calck,calck,calck,calck,ref,calck,calck,ro,calck,calck,ro";
+				else
+					source.types = "cntr,ref,ref,txt,ro,calck,calck,calck,calck,ref,ro,ro,ro,calck,calck,ro";
+
+			})($p.doc.calc_order.metadata().form.obj.tabular_sections.production);
+			_meta_patched = true;
+		}
+
+		attr.draw_tabular_sections = function (o, wnd, tabular_init) {
+
+			/**
+			 * получим задействованные в заказе объекты характеристик
+			 */
+			const refs = [];
+			o.production.each((row) => {
+				if(!$p.utils.is_empty_guid(row._obj.characteristic) && row.characteristic.is_new())
+					refs.push(row._obj.characteristic);
+			});
+			$p.cat.characteristics.pouch_load_array(refs)
+				.then(() => {
+
+					// табчасть продукции со специфическим набором кнопок
+					tabular_init("production", $p.injected_data["toolbar_calc_order_production.xml"]);
+					const {production} = wnd.elmnts.grids;
+          production.disable_sorting = true;
+          production.attachEvent("onRowSelect", (id, ind) => {
+            const row = o.production.get(id - 1);
+            wnd.elmnts.svgs.select(row.characteristic.ref);
+          });
+
+					let toolbar = wnd.elmnts.tabs.tab_production.getAttachedToolbar();
+					toolbar.addSpacer("btn_delete");
+					toolbar.attachEvent("onclick", toolbar_click);
+
+					// табчасть планирования
+					tabular_init("planning");
+					toolbar = wnd.elmnts.tabs.tab_planning.getAttachedToolbar();
+					toolbar.addButton("btn_fill_plan", 3, "Заполнить");
+					toolbar.attachEvent("onclick", toolbar_click);
+
+					// попап для присоединенных файлов
+					wnd.elmnts.discount_pop = new dhtmlXPopup({
+						toolbar: toolbar,
+						id: "btn_discount"
+					});
+					wnd.elmnts.discount_pop.attachEvent("onShow", show_discount);
+
+          // в зависимости от статуса
+          set_editable();
+
+				});
+
+			/**
+			 *	статусбар с картинками
+			 */
+			wnd.elmnts.statusbar = wnd.attachStatusBar();
+			wnd.elmnts.svgs = new $p.iface.OSvgs(wnd, wnd.elmnts.statusbar, rsvg_click);
+			wnd.elmnts.svgs.reload(o);
+
+		};
+
+		attr.draw_pg_header = function (o, wnd) {
+
+			function layout_resize_finish() {
+				setTimeout(function () {
+					if(wnd.elmnts.layout_header.setSizes){
+						wnd.elmnts.layout_header.setSizes();
+						wnd.elmnts.pg_left.objBox.style.width = "100%";
+						wnd.elmnts.pg_right.objBox.style.width = "100%";
+					}
+				}, 200);
+			}
+
+			/**
+			 *	закладка шапка
+			 */
+			wnd.elmnts.layout_header = wnd.elmnts.tabs.tab_header.attachLayout('3U');
+
+			wnd.elmnts.layout_header.attachEvent("onResizeFinish", layout_resize_finish);
+
+			wnd.elmnts.layout_header.attachEvent("onPanelResizeFinish", layout_resize_finish);
+
+			/**
+			 *	левая колонка шапки документа
+			 */
+			wnd.elmnts.cell_left = wnd.elmnts.layout_header.cells('a');
+			wnd.elmnts.cell_left.hideHeader();
+			wnd.elmnts.pg_left = wnd.elmnts.cell_left.attachHeadFields({
+				obj: o,
+				pwnd: wnd,
+				read_only: wnd.elmnts.ro,
+				oxml: {
+					" ": [{id: "number_doc", path: "o.number_doc", synonym: "Номер", type: "ro", txt: o.number_doc},
+						{id: "date", path: "o.date", synonym: "Дата", type: "ro", txt: $p.moment(o.date).format($p.moment._masks.date_time)},
+						"number_internal"
+					],
+					"Контактная информация": ["partner", "client_of_dealer", "phone",
+						{id: "shipping_address", path: "o.shipping_address", synonym: "Адрес доставки", type: "addr", txt: o["shipping_address"]}
+					],
+					"Дополнительные реквизиты": ["obj_delivery_state", "category"]
+				}
+			});
+
+			/**
+			 *	правая колонка шапки документа
+			 * TODO: задействовать либо удалить choice_links
+			 * var choice_links = {contract: [
+				 * {name: ["selection", "owner"], path: ["partner"]},
+				 * {name: ["selection", "organization"], path: ["organization"]}
+				 * ]};
+			 */
+
+			wnd.elmnts.cell_right = wnd.elmnts.layout_header.cells('b');
+			wnd.elmnts.cell_right.hideHeader();
+			wnd.elmnts.pg_right = wnd.elmnts.cell_right.attachHeadFields({
+				obj: o,
+				pwnd: wnd,
+				read_only: wnd.elmnts.ro,
+				oxml: {
+					"Налоги": ["vat_consider", "vat_included"],
+					"Аналитика": ["project",
+						{id: "organization", path: "o.organization", synonym: "Организация", type: "refc"},
+						{id: "contract", path: "o.contract", synonym: "Договор", type: "refc"},
+						{id: "bank_account", path: "o.bank_account", synonym: "Счет организации", type: "refc"},
+						{id: "department", path: "o.department", synonym: "Офис продаж", type: "refc"},
+						{id: "warehouse", path: "o.warehouse", synonym: "Склад отгрузки", type: "refc"},
+						],
+					"Итоги": [{id: "doc_currency", path: "o.doc_currency", synonym: "Валюта документа", type: "ro", txt: o["doc_currency"].presentation},
+						{id: "doc_amount", path: "o.doc_amount", synonym: "Сумма", type: "ron", txt: o["doc_amount"]},
+						{id: "amount_internal", path: "o.amount_internal", synonym: "Сумма внутр", type: "ron", txt: o["amount_internal"]}]
+				}
+			});
+
+			/**
+			 *	редактор комментариев
+			 */
+			wnd.elmnts.cell_note = wnd.elmnts.layout_header.cells('c');
+			wnd.elmnts.cell_note.hideHeader();
+			wnd.elmnts.cell_note.setHeight(100);
+			wnd.elmnts.cell_note.attachHTMLString("<textarea class='textarea_editor'>" + o.note + "</textarea>");
+			// wnd.elmnts.note_editor = wnd.elmnts.cell_note.attachEditor({
+			// 	content: o.note,
+			// 	onFocusChanged: function(name, ev){
+			// 		if(!wnd.elmnts.ro && name == "blur")
+			// 			o.note = this.getContent().replace(/&nbsp;/g, " ").replace(/<.*?>/g, "").replace(/&.{2,6};/g, "");
+			// 	}
+			// });
+
+		};
+
+		attr.toolbar_struct = $p.injected_data["toolbar_calc_order_obj.xml"];
+
+		attr.toolbar_click = toolbar_click;
+
+		attr.on_close = frm_close;
+
+		return this.constructor.prototype.form_obj.call(this, pwnd, attr)
+			.then((res) => {
+				if(res){
+					o = res.o;
+					wnd = res.wnd;
+					return res;
+				}
+			});
+
+
+		/**
+		 * обработчик нажатия кнопок командных панелей
+		 */
+		function toolbar_click(btn_id){
+
+			switch(btn_id) {
+
+				case 'btn_sent':
+					save("sent");
+					break;
+
+				case 'btn_save':
+					save("save");
+					break;
+
+				case 'btn_save_close':
+					save("close");
+					break;
+
+				case 'btn_retrieve':
+					save("retrieve");
+					break;
+
+				case 'btn_post':
+					save("post");
+					break;
+
+				case 'btn_unpost':
+					save("unpost");
+					break;
+
+				case 'btn_fill_plan':
+					o.fill_plan();
+					break;
+
+				case 'btn_close':
+					wnd.close();
+					break;
+
+				case 'btn_add_builder':
+					open_builder(true);
+					break;
+
+				case 'btn_add_product':
+					new CalcOrderFormProductList(wnd, o);
+					break;
+
+				case 'btn_add_material':
+					add_material();
+					break;
+
+				case 'btn_edit':
+					open_builder();
+					break;
+
+				case 'btn_spec':
+					open_spec();
+					break;
+
+				case 'btn_discount':
+
+					break;
+
+				case 'btn_calendar':
+					calendar_new_event();
+					break;
+
+				case 'btn_go_connection':
+					go_connection();
+					break;
+			}
+
+			if(btn_id.substr(0,4)=="prn_")
+				_mgr.print(o, btn_id, wnd);
+		}
+
+		/**
+		 * создаёт событие календаря
+		 */
+		function calendar_new_event(){
+			$p.msg.show_not_implemented();
+		}
+
+		/**
+		 * показывает список связанных документов
+		 */
+		function go_connection(){
+			$p.msg.show_not_implemented();
+		}
+
+		/**
+		 * создаёт и показывает диалог групповых скидок
+		 */
+		function show_discount(){
+			if (!wnd.elmnts.discount) {
+
+				wnd.elmnts.discount = wnd.elmnts.discount_pop.attachForm([
+					{type: "fieldset",  name: "discounts", label: "Скидки по группам", width:220, list:[
+						{type:"settings", position:"label-left", labelWidth:100, inputWidth:50},
+						{type:"input", label:"На продукцию", name:"production", numberFormat:["0.0 %", "", "."]},
+						{type:"input", label:"На аксессуары", name:"accessories", numberFormat:["0.0 %", "", "."]},
+						{type:"input", label:"На услуги", name:"services", numberFormat:["0.0 %", "", "."]}
+					]},
+					{ type:"button" , name:"btn_discounts", value:"Ок", tooltip:"Установить скидки"  }
+				]);
+				wnd.elmnts.discount.setItemValue("production", 0);
+				wnd.elmnts.discount.setItemValue("accessories", 0);
+				wnd.elmnts.discount.setItemValue("services", 0);
+				wnd.elmnts.discount.attachEvent("onButtonClick", function(name){
+					wnd.progressOn();
+					// TODO: _mgr.save
+					//_mgr.save({
+					//	ref: o.ref,
+					//	discounts: {
+					//		production: $p.utils.fix_number(wnd.elmnts.discount.getItemValue("production"), true),
+					//		accessories: $p.utils.fix_number(wnd.elmnts.discount.getItemValue("accessories"), true),
+					//		services: $p.utils.fix_number(wnd.elmnts.discount.getItemValue("services"), true)
+					//	},
+					//	o: o._obj,
+					//	action: "calc",
+					//	specify: "discounts"
+					//}).then(function(res){
+					//	if(!$p.msg.check_soap_result(res))
+					//		wnd.reflect_characteristic_change(res); // - перезаполнить шапку и табчасть
+					//	wnd.progressOff();
+					//	wnd.elmnts.discount_pop.hide();
+					//});
+				});
+			}
+		}
+
+
+		/**
+		 * вспомогательные функции
+		 */
+
+		function production_get_sel_index(){
+			var selId = wnd.elmnts.grids.production.getSelectedRowId();
+			if(selId && !isNaN(Number(selId)))
+				return Number(selId)-1;
+
+			$p.msg.show_msg({
+				type: "alert-warning",
+				text: $p.msg.no_selected_row.replace("%1", "Продукция"),
+				title: o.presentation
+			});
+		}
+
+		function save(action){
+
+			function do_save(post){
+
+				if(!wnd.elmnts.ro){
+					o.note = wnd.elmnts.cell_note.cell.querySelector("textarea").value.replace(/&nbsp;/g, " ").replace(/<.*?>/g, "").replace(/&.{2,6};/g, "");
+					wnd.elmnts.pg_left.selectRow(0);
+				}
+
+				o.save(post)
+					.then(function(){
+
+						if(action == "sent" || action == "close")
+							wnd.close();
+						else{
+							wnd.set_text();
+							set_editable();
+						}
+
+					})
+					.catch(function(err){
+						$p.record_log(err);
+					});
+			}
+
+			if(action == "sent"){
+				// показать диалог и обработать возврат
+				dhtmlx.confirm({
+					title: $p.msg.order_sent_title,
+					text: $p.msg.order_sent_message,
+					cancel: $p.msg.cancel,
+					callback: function(btn) {
+						if(btn){
+							// установить транспорт в "отправлено" и записать
+							o.obj_delivery_state = $p.enm.obj_delivery_states.Отправлен;
+							do_save();
+						}
+					}
+				});
+
+			} else if(action == "retrieve"){
+				// установить транспорт в "отозвано" и записать
+				o.obj_delivery_state =  $p.enm.obj_delivery_states.Отозван;
+				do_save();
+
+			} else if(action == "save" || action == "close"){
+				do_save();
+
+			}else if(action == "post"){
+				do_save(true);
+
+			}else if(action == "unpost"){
+				do_save(false);
+			}
+		}
+
+		function frm_close(){
+
+			// выгружаем из памяти всплывающие окна скидки и связанных файлов
+			['vault','vault_pop','discount','discount_pop','svgs'].forEach((elm) => {
+				wnd && wnd.elmnts && wnd.elmnts[elm] && wnd.elmnts[elm].unload && wnd.elmnts[elm].unload();
+			});
+
+			evts.forEach((id) => $p.eve.detachEvent(id));
+
+			typeof attr_on_close == "function" && attr_on_close();
+
+			return true;
+		}
+
+		// устанавливает видимость и доступность
+		function set_editable(){
+
+		  const {pg_left, pg_right, frm_toolbar, grids, tabs} = wnd.elmnts;
+
+      pg_right.cells("vat_consider", 1).setDisabled(true);
+      pg_right.cells("vat_included", 1).setDisabled(true);
+
+			wnd.elmnts.ro = o.is_read_only;
+
+			const retrieve_enabed = !o._deleted &&
+				(o.obj_delivery_state == $p.enm.obj_delivery_states.Отправлен || o.obj_delivery_state == $p.enm.obj_delivery_states.Отклонен);
+
+      grids.production.setEditable(!wnd.elmnts.ro);
+      grids.planning.setEditable(!wnd.elmnts.ro);
+      pg_left.setEditable(!wnd.elmnts.ro);
+      pg_right.setEditable(!wnd.elmnts.ro);
+
+			// гасим кнопки проведения, если недоступна роль
+			if(!$p.current_user.role_available("СогласованиеРасчетовЗаказов")){
+        frm_toolbar.hideItem("btn_post");
+        frm_toolbar.hideItem("btn_unpost");
+			}
+
+			// если не технологи и не менеджер - запрещаем менять статусы
+			if(!$p.current_user.role_available("ИзменениеТехнологическойНСИ") && !$p.current_user.role_available("СогласованиеРасчетовЗаказов")){
+        pg_left.cells("obj_delivery_state", 1).setDisabled(true);
+			}
+
+			// кнопки записи и отправки гасим в зависимости от статуса
+			if(wnd.elmnts.ro){
+        frm_toolbar.disableItem("btn_sent");
+        frm_toolbar.disableItem("btn_save");
+        let toolbar;
+        const disable = (itemId) => toolbar.disableItem(itemId);
+        toolbar = tabs.tab_production.getAttachedToolbar();
+        toolbar.forEachItem(disable);
+        toolbar = tabs.tab_planning.getAttachedToolbar();
+        toolbar.forEachItem(disable);
+			}
+			else{
+				// шаблоны никогда не надо отправлять
+				if(o.obj_delivery_state == $p.enm.obj_delivery_states.Шаблон){
+          frm_toolbar.disableItem("btn_sent");
+        }
+				else{
+          frm_toolbar.enableItem("btn_sent");
+        }
+        frm_toolbar.enableItem("btn_save");
+				let toolbar;
+				const enable = (itemId) => toolbar.enableItem(itemId);
+        toolbar = tabs.tab_production.getAttachedToolbar();
+        toolbar.forEachItem(enable);
+        toolbar = tabs.tab_planning.getAttachedToolbar();
+        toolbar.forEachItem(enable);
+			}
+			if(retrieve_enabed){
+        frm_toolbar.enableListOption("bs_more", "btn_retrieve");
+      }
+			else{
+        frm_toolbar.disableListOption("bs_more", "btn_retrieve");
+      }
+		}
+
+		/**
+		 * Обработчик события _ЗаписанаХарактеристикаПостроителя_
+		 * @param scheme
+		 * @param sattr
+		 */
+		function characteristic_saved(scheme, sattr){
+
+		  const {ox, _dp} = scheme;
+		  const row = ox.calc_order_row;
+
+			if(!row || ox.calc_order != o){
+        return;
+      }
+
+			//nom,characteristic,note,quantity,unit,qty,len,width,s,first_cost,marginality,price,discount_percent,discount_percent_internal,
+			//discount,amount,margin,price_internal,amount_internal,vat_rate,vat_amount,ordn,changed
+
+			// т.к. табчасть мы будем перерисовывать в любом случае, отключаем обсерверы
+			ox._silent();
+
+			row.nom = ox.owner;
+			row.note = _dp.note;
+			row.quantity = _dp.quantity || 1;
+			row.len = ox.x;
+			row.width = ox.y;
+			row.s = ox.s;
+			row.discount_percent = _dp.discount_percent;
+			row.discount_percent_internal = _dp.discount_percent_internal;
+			if(row.unit.owner != row.nom){
+        row.unit = row.nom.storage_unit;
+      }
+
+			// обновляем табчасть
+      const {production} = wnd.elmnts.grids;
+			production.refresh_row(row);
+      o.production.find_rows({ordn: ox}, (row) => production.refresh_row(row));
+
+			// обновляем эскизы
+			wnd.elmnts.svgs.reload(o);
+
+		}
+
+		/**
+		 * показывает диалог с сообщением "это не продукция"
+		 */
+		function not_production(){
+			$p.msg.show_msg({
+				title: $p.msg.bld_title,
+				type: "alert-error",
+				text: $p.msg.bld_not_product
+			});
+		}
+
+		/**
+		 * ОткрытьПостроитель()
+		 * @param [create_new] {Boolean} - создавать новое изделие или открывать в текущей строке
+		 */
+		function open_builder(create_new){
+			var selId;
+
+			if(create_new){
+        o.create_product_row({grid: wnd.elmnts.grids.production, create: true})
+          .then((row) => $p.iface.set_hash("cat.characteristics", row.characteristic.ref, "builder"));
+			}
+			else{
+			  const selId = production_get_sel_index();
+        if(selId != undefined){
+          const row = o.production.get(selId);
+          if(row){
+            const {owner, calc_order} = row.characteristic;
+            if(row.characteristic.empty() || calc_order.empty() || owner.is_procedure || owner.is_accessory){
+              not_production();
+            }
+            else if(row.characteristic.coordinates.count() == 0){
+              // возможно, это заготовка - проверим номенклатуру системы
+              if(row.characteristic.leading_product.calc_order == calc_order){
+                $p.iface.set_hash("cat.characteristics", row.characteristic.leading_product.ref, "builder");
+              }
+            }
+            else{
+              $p.iface.set_hash("cat.characteristics", row.characteristic.ref, "builder");
+            }
+          }
+        }
+      }
+
+			if(!evts.length){
+				evts.push($p.eve.attachEvent("characteristic_saved", characteristic_saved));
+			}
+		}
+
+		function open_spec(){
+		  const selId = production_get_sel_index();
+			if(selId != undefined){
+				const row = o.production.get(selId);
+        row && !row.characteristic.empty() && row.characteristic.form_obj().then((w) => w.wnd.maximize());
+			}
+		}
+
+		function rsvg_click(ref, dbl) {
+      o.production.find_rows({characteristic: ref}, (row) => {
+        wnd.elmnts.grids.production.selectRow(row.row-1);
+        dbl && open_builder();
+        return false;
+      })
+    }
+
+		/**
+		 * добавляет строку материала
+		 */
+		function add_material(){
+			const row = o.create_product_row({grid: wnd.elmnts.grids.production}).row-1;
+			setTimeout(() => {
+        const grid = wnd.elmnts.grids.production;
+        grid.selectRow(row);
+        grid.selectCell(row, grid.getColIndexById("nom"), false, true, true);
+        grid.cells().open_selection();
+      });
+		}
+
+	};
+
+})($p);
+
+/**
+ * форма выбора документов Расчет-заказ. публикуемый метод: doc.calc_order.form_selection(pwnd, attr)
+ *
+ * &copy; Evgeniy Malyarov http://www.oknosoft.ru 2014-2017
+ *
+ * @module doc_calc_order_form_selection
+ */
+
+
+$p.doc.calc_order.form_selection = function(pwnd, attr){
+
+	const wnd = this.constructor.prototype.form_selection.call(this, pwnd, attr);
+
+	// настраиваем фильтр для списка заказов
+	wnd.elmnts.filter.custom_selection._view = { get value() { return '' } };
+	wnd.elmnts.filter.custom_selection._key = { get value() { return '' } };
+
+	// картинка заказа в статусбаре
+	wnd.do_not_maximize = true;
+	wnd.elmnts.svgs = new $p.iface.OSvgs(wnd, wnd.elmnts.status_bar,
+    (ref, dbl) => {
+	  if(dbl){
+      wnd && wnd.close();
+      return pwnd.on_select && pwnd.on_select({_block: ref});
+    }
+    });
+	wnd.elmnts.grid.attachEvent("onRowSelect", (rid) => wnd.elmnts.svgs.reload(rid));
+
+
+	setTimeout(() => {
+		wnd.setDimension(900, 580);
+		wnd.centerOnScreen();
+	})
+
+	return wnd;
+};
+
+
+/**
+ * ### Отчеты по документу Расчет
+ *
+ * &copy; Evgeniy Malyarov http://www.oknosoft.ru 2014-2017
+ *
+ * Created 23.06.2016
+ *
+ * @module doc_calc_order_reports
+ *
+ */
+
+$p.doc.calc_order.__define({
+
+	rep_invoice_execution: {
+		value: function (rep) {
+
+			var query_options = {
+					reduce: true,
+					limit: 10000,
+					group: true,
+					group_level: 3
+				},
+				res = {
+					data: [],
+					readOnly: true,
+					colWidths: [180, 180, 200, 100, 100, 100, 100, 100],
+					colHeaders: ['Контрагент', 'Организация', 'Заказ', 'Сумма', 'Оплачено', 'Долг', 'Отгружено', 'Отгрузить'],
+					columns: [
+						{type: 'text'},
+						{type: 'text'},
+						{type: 'text'},
+						{type: 'numeric', format: '0 0.00'},
+						{type: 'numeric', format: '0 0.00'},
+						{type: 'numeric', format: '0 0.00'},
+						{type: 'numeric', format: '0 0.00'},
+						{type: 'numeric', format: '0 0.00'}
+					],
+					wordWrap: false
+					//minSpareRows: 1
+				};
+
+			if(!$p.current_user.role_available("СогласованиеРасчетовЗаказов")){
+				//query_options.group_level = 3;
+				query_options.startkey = [$p.current_user.partners_uids[0],""];
+				query_options.endkey = [$p.current_user.partners_uids[0],"\uffff"];
+			}
+
+			return $p.wsql.pouch.remote.doc.query("server/invoice_execution", query_options)
+
+				.then(function (data) {
+
+					var total = {
+						invoice: 0,
+						pay: 0,
+						total_pay: 0,
+						shipment:0,
+						total_shipment:0
+					};
+
+					if(data.rows){
+
+						data.rows.forEach(function (row) {
+
+							if(!row.value.total_pay && !row.value.total_shipment)
+								return;
+
+							res.data.push([
+								$p.cat.partners.get(row.key[0]).presentation,
+								$p.cat.organizations.get(row.key[1]).presentation,
+								row.key[2],
+								row.value.invoice,
+								row.value.pay,
+								row.value.total_pay,
+								row.value.shipment,
+								row.value.total_shipment]);
+
+							total.invoice+= row.value.invoice;
+							total.pay+=row.value.pay;
+							total.total_pay+=row.value.total_pay;
+							total.shipment+=row.value.shipment;
+							total.total_shipment+=row.value.total_shipment;
+						});
+
+						res.data.push([
+							"Итого:",
+							"",
+							"",
+							total.invoice,
+							total.pay,
+							total.total_pay,
+							total.shipment,
+							total.total_shipment]);
+
+						res.mergeCells= [
+							{row: res.data.length-1, col: 0, rowspan: 1, colspan: 3}
+						]
+					}
+
+					rep.requery(res);
+
+					return res;
+				});
+		}
+	},
+
+	rep_planing: {
+		value: function (rep, attr) {
+
+			var date_from = $p.utils.date_add_day(new Date(), -1, true),
+				date_till = $p.utils.date_add_day(date_from, 7, true),
+				query_options = {
+					reduce: true,
+					limit: 10000,
+					group: true,
+					group_level: 5,
+					startkey: [date_from.getFullYear(), date_from.getMonth()+1, date_from.getDate(), ""],
+					endkey: [date_till.getFullYear(), date_till.getMonth()+1, date_till.getDate(),"\uffff"]
+				},
+				res = {
+					data: [],
+					readOnly: true,
+					wordWrap: false
+					//minSpareRows: 1
+				};
+
+
+
+			return $p.wsql.pouch.remote.doc.query("server/planning", query_options)
+
+				.then(function (data) {
+
+
+					if(data.rows){
+
+						var include_detales = $p.current_user.role_available("СогласованиеРасчетовЗаказов");
+
+						data.rows.forEach(function (row) {
+
+							if(!include_detales){
+
+							}
+
+							res.data.push([
+								new Date(row.key[0], row.key[1]-1, row.key[2]),
+								$p.cat.parameters_keys.get(row.key[3]),
+								row.value.debit,
+								row.value.credit,
+								row.value.total
+							]);
+						});
+
+					}
+
+					rep.requery(res);
+
+					return res;
+				});
+
+		}
+	}
+
+});
+
+/**
+ * ### Модуль менеджера и документа _Оплата платежной картой_
+ * &copy; Evgeniy Malyarov http://www.oknosoft.ru 2014-2017
+ *
+ * @module doc_credit_card_order
+ *
+ * Created 10.10.2016
+ */
+
+// подписки на события
+$p.doc.credit_card_order.on({
+
+	// перед записью рассчитываем итоги
+	before_save: function (attr) {
+
+		this.doc_amount = this.payment_details.aggregate([], "amount");
+
+	},
+
+});
+
+
+
+/**
+ * ### Модуль менеджера и документа _Платежное поручение входящее_
+ * &copy; Evgeniy Malyarov http://www.oknosoft.ru 2014-2017
+ *
+ * @module doc_debit_bank_order
+ *
+ * Created 10.10.2016
+ */
+
+// подписки на события
+$p.doc.debit_bank_order.on({
+
+	// перед записью рассчитываем итоги
+	before_save: function (attr) {
+
+		this.doc_amount = this.payment_details.aggregate([], "amount");
+
+	},
+
+});
+
+
+
+/**
+ * ### Модуль менеджера и документа _Приходный кассовый ордер_
+ * &copy; Evgeniy Malyarov http://www.oknosoft.ru 2014-2017
+ *
+ * @module doc_debit_cash_order
+ *
+ * Created 10.10.2016
+ */
+
+// подписки на события
+$p.doc.debit_cash_order.on({
+
+	// перед записью рассчитываем итоги
+	before_save: function (attr) {
+
+		this.doc_amount = this.payment_details.aggregate([], "amount");
+
+	},
+
+});
+
+
+
+/**
+ * ### Модуль менеджера и документа Установка цен номенклатуры
+ *
+ * &copy; Evgeniy Malyarov http://www.oknosoft.ru 2014-2017
+ *
+ * @module doc_nom_prices_setup
+ * Created 28.07.2016
+ */
+
+
+// Переопределяем формирование списка выбора характеристики в табчасти документа установки цен
+$p.doc.nom_prices_setup.metadata().tabular_sections.goods.fields.nom_characteristic._option_list_local = true;
+
+// Подписываемся на события менеджера данных
+$p.doc.nom_prices_setup.on({
+
+	/**
+	 * Обработчик при создании документа
+	 */
+	after_create: function (attr) {
+
+		//Номер документа
+		return this.new_number_doc();
+
+	},
+
+	/**
+	 * Обработчик события "при изменении свойства" в шапке или табличной части при редактировании в форме объекта
+	 * @this {DataObj} - обработчик вызывается в контексте текущего объекта
+	 */
+	add_row: function (attr) {
+
+		// установим валюту и тип цен по умолчению при добавлении строки
+		if(attr.tabular_section == "goods"){
+			attr.row.price_type = this.price_type;
+			attr.row.currency = this.price_type.price_currency;
+		}
+
+	},
+
+	// перед записью проверяем уникальность ключа
+	before_save: function (attr) {
+		var aggr = this.goods.aggregate(["nom","nom_characteristic","price_type"], ["price"], "COUNT", true),
+			err;
+		if(aggr.some(function (row) {
+			if(row.price > 1){
+				err = row;
+				return row.price > 1;
+			}
+		})){
+			$p.msg.show_msg({
+				type: "alert-warning",
+				text: "<table style='text-align: left; width: 100%;'><tr><td>Номенклатура</td><td>" + $p.cat.nom.get(err.nom).presentation + "</td></tr>" +
+					"<tr><td>Характеристика</td><td>" + $p.cat.characteristics.get(err.nom_characteristic).presentation + "</td></tr>" +
+					"<tr><td>Тип цен</td><td>" + $p.cat.nom_prices_types.get(err.price_type).presentation + "</td></tr></table>",
+				title: "Дубли строк"
+			});
+
+			return false;
+		}
+	}
+});
+
+// Подписываемся на глобальное событие tabular_paste
+$p.on("tabular_paste", function (clip) {
+
+	if(clip.grid && clip.obj && clip.obj._manager == $p.doc.nom_prices_setup){
+
+		var rows = [];
+
+		clip.data.split("\n").map(function (row) { return row.split("\t"); }).forEach(function (row) {
+
+			if(row.length != 3)
+				return;
+
+			var nom = $p.cat.nom.by_name(row[0]);
+			if(nom.empty())
+				nom = $p.cat.nom.by_id(row[0]);
+			if(nom.empty())
+				nom = $p.cat.nom.find({article: row[0]});
+			if(!nom || nom.empty())
+				return;
+
+			var characteristic = "";
+			if(row[1]){
+				characteristic = $p.cat.characteristics.find({owner: nom, name: row[1]});
+				if(!characteristic || characteristic.empty())
+					characteristic = $p.cat.characteristics.find({owner: nom, name: {like: row[1]}});
+			}
+
+			rows.push({
+				nom: nom,
+				nom_characteristic: characteristic,
+				price: parseFloat(row[2].replace(",", ".")),
+				price_type: clip.obj.price_type
+			});
+		});
+
+		if(rows.length){
+
+			clip.grid.editStop();
+
+			var first = clip.obj.goods.get(parseInt(clip.grid.getSelectedRowId()) -1);
+
+			rows.forEach(function (row) {
+				if(first){
+					first._mixin(row);
+					first = null;
+				}else
+					clip.obj.goods.add(row);
+			});
+
+			clip.obj.goods.sync_grid(clip.grid);
+
+			clip.e.preventDefault();
+			return $p.iface.cancel_bubble(e);
+		}
+	}
+
+});
+
+/**
+ * ### Модуль менеджера и документа _Реализация товаров и услуг_
+ * &copy; Evgeniy Malyarov http://www.oknosoft.ru 2014-2017
+ *
+ * @module doc_selling
+ *
+ * Created 10.10.2016
+ */
+
+// подписки на события
+$p.doc.selling.on({
+
+	// перед записью рассчитываем итоги
+	before_save: function (attr) {
+
+		this.doc_amount = this.goods.aggregate([], "amount") + this.services.aggregate([], "amount");
+
+	},
+
+});
+
+
+
 return $p;
 };
