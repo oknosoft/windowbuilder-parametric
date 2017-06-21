@@ -23,6 +23,7 @@ gulp.task('modifiers', function(){
     './src/modifiers/charts_characteristics/*.js',
     './src/modifiers/dataprocessors/*.js',
     './src/modifiers/documents/*.js',
+    './src/modifiers/common/*.js',
   ])
     .pipe(concat('modifiers.js'))
     .pipe(wrap({ src: './src/metadata/modifiers.txt'}))

@@ -33,6 +33,7 @@ module.exports = async (ctx, $p) => {
       }
     }, (e, r, body) => {
       if(r && r.statusCode < 201){
+        $p.wsql.set_user_param("user_name", auth.substr(0, sep));
         resolve(true);
       }
       else{

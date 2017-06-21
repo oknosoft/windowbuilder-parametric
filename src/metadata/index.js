@@ -14,30 +14,11 @@ const $p = new MetaEngine();
 debug('created');
 
 // эмулируем излучатель событий dhtmlx
-$p.eve = {
+require('./dhtmlx_eve')($p);
 
-  cache: {},
+// обеспечиваем совместимость DataManager с v0.12
+require('./meta_pouchdb')($p.classes.DataManager.prototype);
 
-  callEvent(type, args) {
-    $p.md.emit(type, args);
-  },
-
-  attachEvent(type, listener) {
-    $p.md.on(type, listener);
-    const id = $p.utils.generate_guid();
-    this.cache[id] = [type, listener];
-    return id;
-  },
-
-  detachEvent(id) {
-    const ev = this.cache[id];
-    if(ev){
-      $p.md.off(ev[0], ev[1]);
-      delete this.cache[id];
-    }
-  }
-
-};
 
 
 // инициализируем параметры сеанса и метаданные
