@@ -22,33 +22,43 @@ async function calc_order(ctx, next) {
   const dp = $p.dp.buyers_order.create();
   const query = await getBody(ctx.req);
 
-  dp.calc_order = o;
-  if(o.is_new()){
-    o._manager.emit('after_create', o, {});
-  }
-  else{
-    await o.load_production();
-    o.production.clear(true);
-  }
-  o.date = new Date(query.date);
-  if(query.partner){
-    o.partner = query.partner;
-  }
-  if(o.contract.empty()){
-    o.contract = $p.cat.contracts.by_partner_and_org(o.partner, o.organization)
-  }
-  o.vat_consider = o.vat_included = true;
-  for(let row of query.production){
-    const prow = dp.production.add(row);
-    prow.inset = row.nom;
-  }
-
   try{
+    let prod;
+    dp.calc_order = o;
+    if(o.is_new()){
+      o._manager.emit('after_create', o, {});
+    }
+    else{
+      if(o.posted){
+        ctx.status = 403;
+        ctx.body = `Запрещено изменять проведенный заказ ${res.ref}`;
+        return o.unload();
+      }
+      prod = await o.load_production();
+      o.production.clear(true);
+    }
+    o.date = new Date(query.date);
+    if(query.partner){
+      o.partner = query.partner;
+    }
+    if(o.contract.empty()){
+      o.contract = $p.cat.contracts.by_partner_and_org(o.partner, o.organization)
+    }
+    o.vat_consider = o.vat_included = true;
+    for(let row of query.production){
+      const prow = dp.production.add(row);
+      prow.inset = row.nom;
+    }
     await o.process_add_product_list(dp);
     await o.save();
     ctx.body = JSON.stringify(o);
     o.production.forEach((row) => {
       const {characteristic} = row;
+      if (!characteristic.empty() && !characteristic.is_new() && !characteristic.calc_order.empty()) {
+        characteristic.unload();
+      }
+    });
+    prod.forEach((characteristic) => {
       if (!characteristic.empty() && !characteristic.is_new() && !characteristic.calc_order.empty()) {
         characteristic.unload();
       }
