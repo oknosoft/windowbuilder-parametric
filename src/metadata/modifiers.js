@@ -3,7 +3,7 @@ module.exports = function($p) {
  * Дополнительные методы перечисления Типы соединений
  *
  * Created 23.12.2015<br />
- * &copy; http://www.oknosoft.ru 2014-2015
+ * &copy; http://www.oknosoft.ru 2014-2017
  * @author Evgeniy Malyarov
  * @module enm_cnn_types
  */
@@ -1823,7 +1823,7 @@ $p.CatFormulas.prototype.__define({
  * Дополнительные методы справочника Фурнитура
  *
  * Created 23.12.2015<br />
- * &copy; http://www.oknosoft.ru 2014-2015
+ * &copy; http://www.oknosoft.ru 2014-2017
  * @author Evgeniy Malyarov
  * @module cat_furns
  */
@@ -2218,7 +2218,7 @@ Object.defineProperties($p.cat.furns, {
  * Дополнительные методы справочника Вставки
  *
  * Created 23.12.2015<br />
- * &copy; http://www.oknosoft.ru 2014-2015
+ * &copy; http://www.oknosoft.ru 2014-2017
  * @author Evgeniy Malyarov
  * @module cat_inserts
  */
@@ -3020,7 +3020,7 @@ $p.CatPartners.prototype.__define({
  * Дополнительные методы справочника Системы (Параметры продукции)
  *
  * Created 23.12.2015<br />
- * &copy; http://www.oknosoft.ru 2014-2015
+ * &copy; http://www.oknosoft.ru 2014-2017
  * @author Evgeniy Malyarov
  * @module cat_production_params
  */
