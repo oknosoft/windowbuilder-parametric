@@ -7,7 +7,7 @@
   "main": "index.js",
   "engines": {
     "node": "^7.10",
-    "npm": "^4.2"
+    "npm": "^5.0"
   },
   "scripts": {
     "prebuild:meta": "node ./src/metadata/prebuild",
@@ -15,12 +15,12 @@
   },
   "dependencies": {
     "alasql": "^0.4",
-    "koa": "^2.2",
+    "koa": "^2.3.0",
     "koa-better-router": "^2.1",
     "koa-static": "^3.0",
-    "metadata-abstract-ui": "2.0.0-beta.15",
-    "metadata-core": "2.0.0-beta.15",
-    "metadata-pouchdb": "2.0.0-beta.15",
+    "metadata-abstract-ui": "2.0.0-beta.16",
+    "metadata-core": "2.0.0-beta.16",
+    "metadata-pouchdb": "2.0.0-beta.16",
     "moment": "^2.18",
     "pouchdb": "^6.2",
     "pouchdb-adapter-http": "^6.2",
@@ -34,23 +34,23 @@
     "pouchdb-replication": "^6.2"
   },
   "devDependencies": {
-    "clipboard": "^1.6",
+    "clipboard": "^1.7",
     "debug": "^2.6",
     "eslint": "^4.0",
     "eslint-config-standard": "^10.2",
     "eslint-config-standard-react": "^5.0",
     "eslint-plugin-babel": "^4.1",
-    "eslint-plugin-import": "^2.3",
+    "eslint-plugin-import": "^2.5",
     "eslint-plugin-node": "^5.0",
     "eslint-plugin-promise": "^3.5",
-    "eslint-plugin-react": "^7.0",
+    "eslint-plugin-react": "^7.1",
     "eslint-plugin-standard": "^3.0",
     "gulp": "^3.9",
     "gulp-base64": "^0.1",
     "gulp-concat": "^2.6",
     "gulp-csso": "^3.0",
     "gulp-rename": "^1.2",
-    "gulp-replace": "^0.5",
+    "gulp-replace": "^0.6",
     "gulp-strip-comments": "^2.4",
     "gulp-uglify": "^3.0",
     "gulp-umd": "^0.2",
