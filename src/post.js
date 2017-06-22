@@ -51,6 +51,14 @@ async function calc_order(ctx, next) {
     }
     await o.process_add_product_list(dp);
     await o.save();
+    for(let row of o._obj.production){
+      const ox = $p.cat.characteristics.get(row.characteristic);
+      row.clr = ox && ox.clr ? ox.clr.ref : '';
+      for(let fld of ['margin','price_internal','amount_internal','marginality','first_cost','discount','discount_percent',
+        'discount_percent_internal','changed','ordn','characteristic']){
+        delete row[fld];
+      }
+    }
     ctx.body = JSON.stringify(o);
     o.production.forEach((row) => {
       const {characteristic} = row;
@@ -58,9 +66,9 @@ async function calc_order(ctx, next) {
         characteristic.unload();
       }
     });
-    prod.forEach((characteristic) => {
-      if (!characteristic.empty() && !characteristic.is_new() && !characteristic.calc_order.empty()) {
-        characteristic.unload();
+    prod.forEach((cx) => {
+      if (!cx.empty() && !cx.is_new() && !cx.calc_order.empty()) {
+        cx.unload();
       }
     });
     o.unload();

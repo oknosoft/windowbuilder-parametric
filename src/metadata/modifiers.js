@@ -2,9 +2,10 @@ module.exports = function($p) {
 /**
  * Дополнительные методы перечисления Типы соединений
  *
- * Created 23.12.2015<br />
- * &copy; http://www.oknosoft.ru 2014-2017
- * @author Evgeniy Malyarov
+ * &copy; Evgeniy Malyarov http://www.oknosoft.ru 2014-2017
+ *
+ * Created 23.12.2015
+ *
  * @module enm_cnn_types
  */
 
@@ -95,7 +96,9 @@ module.exports = function($p) {
 
 /**
  * Дополнительные методы перечисления Типы элементов
- * @author Evgeniy Malyarov
+ *
+ * &copy; Evgeniy Malyarov http://www.oknosoft.ru 2014-2017
+ *
  * @module enm_elm_types
  */
 
@@ -4899,6 +4902,9 @@ $p.doc.calc_order.on({
       const mgr = $p.cat.characteristics;
       let cx;
       mgr.find_rows({calc_order: this, product: row.row}, (ox) => {
+        for(let ts in mgr.metadata().tabular_sections){
+          ox[ts].clear(true);
+        }
         cx = Promise.resolve(ox);
       });
 
