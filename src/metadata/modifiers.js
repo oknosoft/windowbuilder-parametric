@@ -335,12 +335,18 @@ $p.cat.characteristics.on({
 	// перед записью надо пересчитать наименование и рассчитать итоги
 	before_save: function (attr) {
 
+    let obj = this;
+    if(attr instanceof $p.CatCharacteristics){
+      obj = attr;
+      attr = arguments[1];
+    }
+
 		// уточняем номенклатуру системы
-    const {prod_nom, calc_order} = this;
+    const {prod_nom, calc_order} = obj;
 
     // контроль прав на запись характеристики
     if(calc_order.is_read_only){
-      this._data._err = {
+      obj._data._err = {
         title: 'Права доступа',
         type: 'alert-error',
         text: `Запрещено изменять заказ в статусе ${calc_order.obj_delivery_state}`
@@ -349,13 +355,13 @@ $p.cat.characteristics.on({
     }
 
 		// пересчитываем наименование
-		const name = this.prod_name();
+		const name = obj.prod_name();
 		if(name){
-      this.name = name;
+      obj.name = name;
     }
 
 		// дублируем контрагента для целей RLS
-		this.partner = calc_order.partner;
+    obj.partner = calc_order.partner;
 
 	},
 
@@ -1735,9 +1741,9 @@ $p.CatElm_visualization.prototype.__define({
 $p.on({
 
   // обработчик события после загрузки данных в озу
-	pouch_load_data_loaded: function cat_formulas_data_loaded () {
+	pouch_data_loaded: function cat_formulas_data_loaded () {
 
-    $p.off('pouch_load_data_loaded', cat_formulas_data_loaded);
+    $p.off('pouch_data_loaded', cat_formulas_data_loaded);
 
 		// читаем элементы из pouchdb и создаём формулы
 		$p.cat.formulas.pouch_find_rows({ _top: 500, _skip: 0 })
@@ -1769,10 +1775,10 @@ $p.CatFormulas.prototype.__define({
 			if(!this._data._formula && this.formula){
 			  if(this.async){
           const AsyncFunction = Object.getPrototypeOf(async function(){}).constructor;
-          this._data._formula = (new AsyncFunction("obj", this.formula)).bind(this);
+          this._data._formula = (new AsyncFunction("obj,$p", this.formula)).bind(this);
         }
         else{
-          this._data._formula = (new Function("obj", this.formula)).bind(this);
+          this._data._formula = (new Function("obj,$p", this.formula)).bind(this);
         }
       }
 
@@ -1790,14 +1796,14 @@ $p.CatFormulas.prototype.__define({
         }
 
 				// получаем HTMLDivElement с отчетом
-				return _formula(obj)
+				return _formula(obj, $p)
 
 				  // показываем отчет в отдельном окне
 					.then((doc) => doc instanceof $p.SpreadsheetDocument && doc.print());
 
 			}
 			else{
-        return _formula && _formula(obj)
+        return _formula && _formula(obj, $p)
       }
 
 		}
@@ -3291,9 +3297,9 @@ $p.CatUsers.prototype.__define({
 
 	// Подписываемся на событие окончания загрузки локальных данных
 	$p.on({
-		pouch_load_data_loaded: function predefined_elmnts_data_loaded() {
+    pouch_data_loaded: function predefined_elmnts_data_loaded() {
 
-			$p.off('pouch_load_data_loaded', predefined_elmnts_data_loaded);
+			$p.off('pouch_data_loaded', predefined_elmnts_data_loaded);
 
 			// читаем элементы из pouchdb и создаём свойства
 			$p.cch.predefined_elmnts.pouch_find_rows({_raw: true, _top: 500, _skip: 0})
@@ -4220,11 +4226,12 @@ $p.doc.calc_order.on({
 	// после создания надо заполнить реквизиты по умолчанию: контрагент, организация, договор
 	after_create: function (attr) {
 
-	  const obj = arguments.length > 1 ? attr : this;
-	  const {enm, cat, current_user, DocCalc_order} = $p;
+    const {enm, cat, current_user, DocCalc_order} = $p;
 	  const {acl_objs} = current_user;
 
-	  if(arguments.length > 1){
+    let obj = this;
+	  if(attr instanceof DocCalc_order){
+      obj = attr;
       attr = arguments[1];
     }
 
@@ -4260,10 +4267,11 @@ $p.doc.calc_order.on({
 	// перед записью надо присвоить номер для нового и рассчитать итоги
 	before_save: function (attr) {
 
-    const obj = arguments.length > 1 ? attr : this;
     const {Отклонен, Отозван, Шаблон, Подтвержден, Отправлен} = $p.enm.obj_delivery_states;
 
-    if(arguments.length > 1){
+    let obj = this;
+    if(attr instanceof $p.DocCalc_order){
+      obj = attr;
       attr = arguments[1];
     }
 
@@ -4375,15 +4383,21 @@ $p.doc.calc_order.on({
 	// при изменении реквизита
 	value_change: function (attr) {
 
+    let obj = this;
+    if(attr instanceof $p.DocCalc_order){
+      obj = attr;
+      attr = arguments[1];
+    }
+
 		// реквизиты шапки
 		if(attr.field == "organization"){
-			this.new_number_doc();
-			if(this.contract.organization != attr.value){
-        this.contract = $p.cat.contracts.by_partner_and_org(this.partner, attr.value);
+      obj.new_number_doc();
+			if(obj.contract.organization != attr.value){
+        obj.contract = $p.cat.contracts.by_partner_and_org(obj.partner, attr.value);
       }
 		}
-		else if(attr.field == "partner" && this.contract.owner != attr.value){
-			this.contract = $p.cat.contracts.by_partner_and_org(attr.value, this.organization);
+		else if(attr.field == "partner" && obj.contract.owner != attr.value){
+      obj.contract = $p.cat.contracts.by_partner_and_org(attr.value, obj.organization);
 
 		}
     // табчасть продукции
@@ -4427,7 +4441,7 @@ $p.doc.calc_order.on({
 				attr.row.amount_internal = (attr.row.price_internal * ((100 - attr.row.discount_percent_internal)/100) * attr.row.quantity).round(2);
 
 				// ставка и сумма НДС
-				if(this.vat_consider){
+				if(obj.vat_consider){
           const {НДС18, НДС18_118, НДС10, НДС10_110, НДС20, НДС20_120, НДС0, БезНДС} = $p.enm.vat_rates;
 					attr.row.vat_rate = attr.row.nom.vat_rate.empty() ? НДС18 : attr.row.nom.vat_rate;
 					switch (attr.row.vat_rate){
@@ -4448,7 +4462,7 @@ $p.doc.calc_order.on({
 							attr.row.vat_amount = 0;
 							break;
 					}
-					if(!this.vat_included){
+					if(!obj.vat_included){
 						attr.row.amount = (attr.row.amount + attr.row.vat_amount).round(2);
 					}
 				}
@@ -4457,8 +4471,8 @@ $p.doc.calc_order.on({
 					attr.row.vat_amount = 0;
 				}
 
-				this.doc_amount = this.production.aggregate([], ["amount"]).round(2);
-				this.amount_internal = this.production.aggregate([], ["amount_internal"]).round(2);
+        obj.doc_amount = obj.production.aggregate([], ["amount"]).round(2);
+        obj.amount_internal = obj.production.aggregate([], ["amount_internal"]).round(2);
 
 				// TODO: учесть валюту документа, которая может отличаться от валюты упр. учета и решить вопрос с amount_operation
 
@@ -4926,9 +4940,10 @@ $p.doc.calc_order.on({
      */
     process_add_product_list(dp) {
 
-      return new Promise((resolve, reject) => {
+      return new Promise(async (resolve, reject) => {
 
-        dp.production.forEach(async (row_spec) => {
+        for(let i = 0; i < dp.production.count(); i++){
+          const row_spec = dp.production.get(i);
           if(row_spec.inset.empty()){
             return;
           }
@@ -4972,7 +4987,7 @@ $p.doc.calc_order.on({
             save: true,
           }, true);
 
-        });
+        }
 
         resolve();
 
@@ -6513,46 +6528,46 @@ class Pricing {
    */
   calc_amount (prm) {
 
-    // TODO: реализовать расчет цены продажи по номенклатуре строки расчета
+    const {calc_order_row, price_type} = prm;
     const price_cost = $p.job_prm.pricing.marginality_in_spec ?
       prm.spec.aggregate([], ["amount_marged"]) :
-      this.nom_price(prm.calc_order_row.nom, prm.calc_order_row.characteristic, prm.price_type.price_type_sale, prm, {});
+      this.nom_price(calc_order_row.nom, calc_order_row.characteristic, price_type.price_type_sale, prm, {});
 
     let extra_charge = $p.wsql.get_user_param("surcharge_internal", "number");
 
     // если пересчет выполняется менеджером, используем наценку по умолчанию
     if(!$p.current_user.partners_uids.length || !extra_charge){
-      extra_charge = prm.price_type.extra_charge_external;
+      extra_charge = price_type.extra_charge_external;
     }
 
     // цена продажи
     if(price_cost){
-      prm.calc_order_row.price = price_cost.round(2);
+      calc_order_row.price = price_cost.round(2);
     }
     else{
-      prm.calc_order_row.price = (prm.calc_order_row.first_cost * prm.price_type.marginality).round(2);
+      calc_order_row.price = (calc_order_row.first_cost * price_type.marginality).round(2);
     }
 
     // КМарж в строке расчета
-    prm.calc_order_row.marginality = prm.calc_order_row.first_cost ?
-      prm.calc_order_row.price * ((100 - prm.calc_order_row.discount_percent)/100) / prm.calc_order_row.first_cost : 0;
+    calc_order_row.marginality = calc_order_row.first_cost ?
+      calc_order_row.price * ((100 - calc_order_row.discount_percent)/100) / calc_order_row.first_cost : 0;
 
 
     // TODO: Рассчитаем цену и сумму ВНУТР или ДИЛЕРСКУЮ цену и скидку
     if(extra_charge){
-      prm.calc_order_row.price_internal = (prm.calc_order_row.price *
-      (100 - prm.calc_order_row.discount_percent)/100 * (100 + extra_charge)/100).round(2);
+      calc_order_row.price_internal = (calc_order_row.price *
+      (100 - calc_order_row.discount_percent)/100 * (100 + extra_charge)/100).round(2);
 
       // TODO: учесть формулу
     }
 
     // Эмулируем событие окончания редактирования, чтобы единообразно пересчитать строку табчасти
     if(!prm.hand_start){
-      $p.doc.calc_order.handle_event(prm.calc_order_row._owner._owner, "value_change", {
+      $p.doc.calc_order.handle_event(calc_order_row._owner._owner, "value_change", {
         field: "price",
-        value: prm.calc_order_row.price,
+        value: calc_order_row.price,
         tabular_section: "production",
-        row: prm.calc_order_row,
+        row: calc_order_row,
         no_extra_charge: true
       });
     }

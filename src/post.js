@@ -18,23 +18,49 @@ function getBody(req){
 async function calc_order(ctx, next) {
 
   const res = {ref: ctx.route.params.ref, production: []};
-  const o = await $p.doc.calc_order.create({ref: res.ref}, true);
+  const o = await $p.doc.calc_order.get(res.ref, 'promise');
   const dp = $p.dp.buyers_order.create();
   const query = await getBody(ctx.req);
 
   dp.calc_order = o;
+  if(o.is_new()){
+    o._manager.emit('after_create', o, {});
+  }
+  else{
+    await o.load_production();
+    o.production.clear(true);
+  }
+  o.date = new Date(query.date);
   if(query.partner){
     o.partner = query.partner;
   }
-  o.date = new Date(query.date);
+  if(o.contract.empty()){
+    o.contract = $p.cat.contracts.by_partner_and_org(o.partner, o.organization)
+  }
+  o.vat_consider = o.vat_included = true;
   for(let row of query.production){
     const prow = dp.production.add(row);
     prow.inset = row.nom;
   }
 
-  await o.process_add_product_list(dp);
+  try{
+    await o.process_add_product_list(dp);
+    await o.save();
+    ctx.body = JSON.stringify(o);
+    o.production.forEach((row) => {
+      const {characteristic} = row;
+      if (!characteristic.empty() && !characteristic.is_new() && !characteristic.calc_order.empty()) {
+        characteristic.unload();
+      }
+    });
+    o.unload();
+  }
+  catch(err){
+    ctx.status = 500;
+    ctx.body = err ? (err.stack || err.message) : `Ошибка при расчете параметрической спецификации заказа ${res.ref}`;
+    debug(err);
+  }
 
-  ctx.body = {ok: true};
 }
 
 // формирует json описания продукций массива заказов

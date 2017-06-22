@@ -11,12 +11,6 @@ module.exports = function(proto) {
       }
     },
 
-    pouch_load_array: {
-      get: function () {
-        return this.load_array
-      }
-    },
-
     pouch_load_view: {
       value: function (view) {
         return this.adapter.load_view(this, view);
@@ -27,7 +21,13 @@ module.exports = function(proto) {
       get: function () {
         return this.find_rows_remote
       }
-    }
+    },
+
+    handle_event: {
+      value: function (obj, name, attr) {
+        this.emit(name, obj, attr);
+      }
+    },
 
   });
 }

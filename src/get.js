@@ -9,18 +9,22 @@ debug('required');
 // формирует json описания продукции заказа
 async function calc_order(ctx, next) {
 
-  const res = {ref: ctx.route.params.ref, production: []};
-  const o = await $p.doc.calc_order.get(res.ref, 'promise');
+  const {ref} = ctx.route.params;
+  const o = await $p.doc.calc_order.get(ref, 'promise');
+
   if(o.is_new()){
-    Object.assign(res, {error: true, message: `Заказ с идентификатором '${ctx.route.params.ref}' не существует`});
     ctx.status = 404;
+    ctx.body = {
+      ref: ref,
+      production: [],
+      error: true,
+      message: `Заказ с идентификатором '${ref}' не существует`,
+    };
   }
   else{
-    Object.assign(res, {ok: true, number_doc: o.number_doc, date: o.date});
-    const prod = await o.load_production();
+    ctx.body = JSON.stringify(o);
   }
-
-  ctx.body = res;
+  o.unload();
 }
 
 async function cat(ctx, next) {
