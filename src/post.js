@@ -1,6 +1,6 @@
 'use strict';
 
-const debug = require('debug')('wb:get');
+const debug = require('debug')('wb:post');
 const $p = require('./metadata');
 const auth = require('./auth');
 
@@ -37,7 +37,7 @@ async function calc_order(ctx, next) {
       prod = await o.load_production();
       o.production.clear(true);
     }
-    o.date = new Date(query.date);
+    o.date = $p.utils.moment(query.date).toDate();
     if(query.partner){
       o.partner = query.partner;
     }
@@ -49,7 +49,8 @@ async function calc_order(ctx, next) {
       const prow = dp.production.add(row);
       prow.inset = row.nom;
     }
-    await o.process_add_product_list(dp);
+    const ax = await o.process_add_product_list(dp);
+    await Promise.all(ax);
     await o.save();
     for(let row of o._obj.production){
       const ox = $p.cat.characteristics.get(row.characteristic);
@@ -58,15 +59,12 @@ async function calc_order(ctx, next) {
         'discount_percent_internal','changed','ordn','characteristic']){
         delete row[fld];
       }
+      if (ox && !ox.empty() && !ox.is_new() && !ox.calc_order.empty()) {
+        ox.unload();
+      }
     }
     ctx.body = JSON.stringify(o);
-    o.production.forEach((row) => {
-      const {characteristic} = row;
-      if (!characteristic.empty() && !characteristic.is_new() && !characteristic.calc_order.empty()) {
-        characteristic.unload();
-      }
-    });
-    prod.forEach((cx) => {
+    prod && prod.forEach((cx) => {
       if (!cx.empty() && !cx.is_new() && !cx.calc_order.empty()) {
         cx.unload();
       }

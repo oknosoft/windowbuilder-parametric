@@ -2280,8 +2280,9 @@ $p.cat.inserts.__define({
      */
     nom(elm, strict) {
 
-      if(!strict && this._data.nom){
-        return this._data.nom;
+      const {_data} = this;
+      if(!strict && _data.nom){
+        return _data.nom;
       }
 
       const main_rows = [];
@@ -2321,14 +2322,14 @@ $p.cat.inserts.__define({
       }
 
       if(main_rows.length < 2){
-        this._data.nom = typeof _nom == 'string' ? $p.cat.nom.get(_nom) : _nom;
+        _data.nom = typeof _nom == 'string' ? $p.cat.nom.get(_nom) : _nom;
       }
       else{
         // TODO: реализовать фильтр
-        this._data.nom = _nom;
+        _data.nom = _nom;
       }
 
-      return _nom;
+      return _data.nom;
     }
 
     /**
@@ -4923,7 +4924,7 @@ $p.doc.calc_order.on({
         .then((ox) => {
           // если указана строка-генератор, заполняем реквизиты
           if(row_spec instanceof $p.DpBuyers_orderProductionRow){
-            ox.owner = row.nom = row_spec.inset.nom(elm);
+            ox.owner = row.nom = row_spec.inset.nom(elm, true);
             ox.origin = row_spec.inset;
             ox.x = row.len = row_spec.len;
             ox.y = row.width = row_spec.height;
@@ -4954,6 +4955,8 @@ $p.doc.calc_order.on({
     process_add_product_list(dp) {
 
       return new Promise(async (resolve, reject) => {
+
+        const ax = [];
 
         for(let i = 0; i < dp.production.count(); i++){
           const row_spec = dp.production.get(i);
@@ -4993,16 +4996,16 @@ $p.doc.calc_order.on({
           row_prod.characteristic.specification.group_by("nom,clr,characteristic,len,width,s,elm,alp1,alp2,origin,dop", "qty,totqty,totqty1");
 
           // производим дополнительную корректировку спецификации и рассчитываем цены
-          $p.spec_building.specification_adjustment({
+          [].push.apply(ax, $p.spec_building.specification_adjustment({
             //scheme: scheme,
             calc_order_row: row_prod,
             spec: row_prod.characteristic.specification,
             save: true,
-          }, true);
+          }, true));
 
         }
 
-        resolve();
+        resolve(ax);
 
       });
     }
@@ -7755,6 +7758,8 @@ class SpecBuilding {
     });
     adel.forEach((row) => calc_order.production.del(row.row-1));
 
+    const ax = [];
+
     // затем, добавляем в заказ строки, назначенные к вытягиванию
     ox._order_rows && ox._order_rows.forEach((cx) => {
       const row = order_rows.get(cx) || calc_order.production.add({characteristic: cx});
@@ -7767,7 +7772,7 @@ class SpecBuilding {
       row.qty = calc_order_row.qty;
       row.quantity = calc_order_row.quantity;
 
-      save && cx.save().catch($p.record_log);
+      save && ax.push(cx.save().catch($p.record_log));
       order_rows.set(cx, row);
     });
     if(order_rows.size){
@@ -7782,9 +7787,11 @@ class SpecBuilding {
       $p.pricing.calc_amount(attr);
     }
 
-    if(attr.save && !attr.scheme && (ox.is_new() || ox._modified)){
-      ox.save().catch($p.record_log);
+    if(save && !attr.scheme && (ox.is_new() || ox._modified)){
+      ax.push(ox.save().catch($p.record_log));
     }
+
+    return ax;
   }
 
 }
