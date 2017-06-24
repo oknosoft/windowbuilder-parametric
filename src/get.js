@@ -51,7 +51,7 @@ async function cat(ctx, next) {
       .filter((o) => !o.is_folder && (!o.predefined_name || predefined_names.indexOf(o.predefined_name) != -1))
       .map((o) => ({
         ref: o.ref,
-        id: o.id.pad(3),
+        id: o.id ? o.id.pad(3) : "000",
         name: o.name,
       })),
     // вставки
