@@ -1321,19 +1321,19 @@ $p.cat.cnns.__define({
   nom_cnn: {
     value: function(nom1, nom2, cnn_types, ign_side, is_outer){
 
-      // если второй элемент вертикальный - меняем местами эл 1-2 при поиске
-      if(nom1 instanceof $p.Editor.ProfileItem &&
-        nom2 instanceof $p.Editor.ProfileItem &&
-        cnn_types && cnn_types.indexOf($p.enm.cnn_types.УгловоеДиагональное) != -1 &&
-        nom1.orientation != $p.enm.orientations.Вертикальная &&
-        nom2.orientation == $p.enm.orientations.Вертикальная ){
+      const {ProfileItem, BuilderElement, Filling} = $p.Editor;
+      const {Вертикальная} = $p.enm.orientations
 
+      // если второй элемент вертикальный - меняем местами эл 1-2 при поиске
+      if(nom1 instanceof ProfileItem && nom2 instanceof ProfileItem &&
+        cnn_types && cnn_types.indexOf($p.enm.cnn_types.УгловоеДиагональное) != -1 &&
+        nom1.orientation != Вертикальная && nom2.orientation == Вертикальная ){
         return this.nom_cnn(nom2, nom1, cnn_types);
       }
 
       // если оба элемента - профили, определяем сторону
       const side = is_outer ? $p.enm.cnn_sides.Снаружи :
-        (!ign_side && nom1 instanceof $p.Editor.ProfileItem && nom2 instanceof $p.Editor.ProfileItem && nom2.cnn_side(nom1));
+        (!ign_side && nom1 instanceof ProfileItem && nom2 instanceof ProfileItem && nom2.cnn_side(nom1));
 
       let onom2, a1, a2, thickness1, thickness2, is_i = false, art1glass = false, art2glass = false;
 
@@ -1342,7 +1342,7 @@ $p.cat.cnns.__define({
         onom2 = nom2 = $p.cat.nom.get();
       }
       else{
-        if(nom2 instanceof $p.Editor.BuilderElement){
+        if(nom2 instanceof BuilderElement){
           onom2 = nom2.nom;
         }
         else if($p.utils.is_data_obj(nom2)){
@@ -1357,11 +1357,11 @@ $p.cat.cnns.__define({
       const ref2 = onom2.ref;
 
       if(!is_i){
-        if(nom1 instanceof $p.Editor.Filling){
+        if(nom1 instanceof Filling){
           art1glass = true;
           thickness1 = nom1.thickness;
         }
-        else if(nom2 instanceof $p.Editor.Filling){
+        else if(nom2 instanceof Filling){
           art2glass = true;
           thickness2 = nom2.thickness;
         }
@@ -1431,7 +1431,7 @@ $p.cat.cnns.__define({
     value: function(elm1, elm2, cnn_types, curr_cnn, ign_side, is_outer){
 
       // если установленное ранее соединение проходит по типу и стороне, нового не ищем
-      if(curr_cnn && cnn_types && (cnn_types.indexOf(curr_cnn.cnn_type)!=-1)){
+      if(curr_cnn && cnn_types && (cnn_types.indexOf(curr_cnn.cnn_type) != -1) && (cnn_types != $p.enm.cnn_types.acn.ii)){
 
         // TODO: проверить геометрию
 
@@ -1749,21 +1749,25 @@ $p.on({
     $p.off('pouch_data_loaded', cat_formulas_data_loaded);
 
 		// читаем элементы из pouchdb и создаём формулы
-		$p.cat.formulas.pouch_find_rows({ _top: 500, _skip: 0 })
-			.then((rows) =>{
-				rows.forEach((row) => {
+    const {formulas} = $p.cat;
+    formulas.pouch_find_rows({ _top: 500, _skip: 0 })
+			.then((rows) => {
+				rows.forEach((formula) => {
 					// формируем списки печатных форм и внешних обработок
-					if(row.parent == $p.cat.formulas.predefined("printing_plates")){
-						row.params.find_rows({param: "destination"}, (dest) => {
+					if(formula.parent == formulas.predefined("printing_plates")){
+						formula.params.find_rows({param: "destination"}, (dest) => {
 							const dmgr = $p.md.mgr_by_class_name(dest.value);
 							if(dmgr){
 								if(!dmgr._printing_plates){
                   dmgr._printing_plates = {};
                 }
-								dmgr._printing_plates["prn_" + row.ref] = row;
+								dmgr._printing_plates["prn_" + formula.ref] = formula;
 							}
 						})
 					}
+					else if(formula.parent == formulas.predefined("modifiers")){
+            formula.execute();
+          }
 				});
 			});
 	}
@@ -2043,6 +2047,10 @@ Object.defineProperties($p.cat.furns, {
                 coordin = generatrix.getOffsetOf(generatrix.intersect_point(hor)) -
                   generatrix.getOffsetOf(generatrix.getNearestPoint(elm.corns(1))) +
                   (invert ? dop_row.contraction : -dop_row.contraction);
+              }
+              else if(dop_row.offset_option == $p.enm.offset_options.ОтСередины){
+                // не мудрствуя, присваиваем половину длины
+                coordin = len / 2 + (invert ? dop_row.contraction : -dop_row.contraction);
               }
               else{
                 if(invert){
@@ -2346,7 +2354,7 @@ $p.cat.inserts.__define({
       });
 
       if(main_rows.length){
-        var irow = main_rows[0],
+        const irow = main_rows[0],
           sizes = {},
           sz_keys = {},
           sz_prms = ['length', 'width', 'thickness'].map((name) => {
@@ -2383,10 +2391,17 @@ $p.cat.inserts.__define({
               res: res
             });
           }
+          if(irow.count_calc_method == $p.enm.count_calculating_ways.ПоПлощади && this.insert_type == $p.enm.inserts_types.МоскитнаяСетка){
+            // получаем габариты смещенного периметра
+            const bounds = contour.bounds_inner(irow.sz);
+            res.x = bounds.width.round(1);
+            res.y = bounds.height.round(1);
+            res.s = ((res.x * res.y) / 1000000).round(3);
+          }
           else{
             res.x = contour.w + irow.sz;
             res.y = contour.h + irow.sz;
-            res.s = ((res.x * res.y) / 1000000).round(3)
+            res.s = ((res.x * res.y) / 1000000).round(3);
           }
         }
       }
@@ -2596,13 +2611,24 @@ $p.cat.inserts.__define({
 
           if(row_ins_spec.count_calc_method == ПоПлощади){
             row_spec.qty = row_ins_spec.quantity;
-            row_spec.len = (_row.y2 - _row.y1 - row_ins_spec.sz) * (row_ins_spec.coefficient || 0.001);
-            row_spec.width = (_row.x2 - _row.x1 - row_ins_spec.sz) * (row_ins_spec.coefficient || 0.001);
-            row_spec.s = _row.s;
+            if(this.insert_type == $p.enm.inserts_types.МоскитнаяСетка){
+              const bounds = elm.layer.bounds_inner(row_ins_spec.sz);
+              row_spec.len = bounds.height * (row_ins_spec.coefficient || 0.001);
+              row_spec.width = bounds.width * (row_ins_spec.coefficient || 0.001);
+              row_spec.s = (row_spec.len * row_spec.width).round(3);
+            }
+            else{
+              row_spec.len = (_row.y2 - _row.y1 - row_ins_spec.sz) * (row_ins_spec.coefficient || 0.001);
+              row_spec.width = (_row.x2 - _row.x1 - row_ins_spec.sz) * (row_ins_spec.coefficient || 0.001);
+              row_spec.s = _row.s;
+            }
           }
           else if(row_ins_spec.count_calc_method == ПоПериметру){
             const row_prm = {_row: {len: 0, angle_hor: 0, s: _row.s}};
-            elm.perimeter.forEach((rib) => {
+            const perimeter = elm.perimeter ? elm.perimeter : (
+              this.insert_type == $p.enm.inserts_types.МоскитнаяСетка ? elm.layer.perimeter_inner(row_ins_spec.sz) : elm.layer.perimeter
+            )
+            perimeter.forEach((rib) => {
               row_prm._row._mixin(rib);
               row_prm.is_linear = () => rib.profile ? rib.profile.is_linear() : true;
               if(this.check_restrictions(row_ins_spec, row_prm, true)){
@@ -2615,13 +2641,46 @@ $p.cat.inserts.__define({
 
           }
           else if(row_ins_spec.count_calc_method == ПоШагам){
-            const h = _row.y2 - _row.y1, w = _row.x2 - _row.x1;
+
+            const bounds = this.insert_type == $p.enm.inserts_types.МоскитнаяСетка ?
+              elm.layer.bounds_inner(row_ins_spec.sz) : {height: _row.y2 - _row.y1, width: _row.x2 - _row.x1};
+
+            const h = (!row_ins_spec.step_angle || row_ins_spec.step_angle == 180 ? bounds.height : bounds.width);
+            const w = !row_ins_spec.step_angle || row_ins_spec.step_angle == 180 ? bounds.width : bounds.height;
             // (row_ins_spec.attrs_option == $p.enm.inset_attrs_options.ОтключитьШагиВторогоНаправления ||
             // row_ins_spec.attrs_option == $p.enm.inset_attrs_options.ОтключитьВтороеНаправление)
             if(row_ins_spec.step){
-              for(let i = 1; i <= Math.ceil(h / row_ins_spec.step); i++){
+              let qty = 0;
+              let pos;
+              if(row_ins_spec.do_center && h >= row_ins_spec.step ){
+                pos = h / 2;
+                if(pos >= row_ins_spec.offsets &&  pos <= h - row_ins_spec.offsets){
+                  qty++;
+                }
+                for(let i = 1; i <= Math.ceil(h / row_ins_spec.step); i++){
+                  pos = h / 2 + i * row_ins_spec.step;
+                  if(pos >= row_ins_spec.offsets &&  pos <= h - row_ins_spec.offsets){
+                    qty++;
+                  }
+                  pos = h / 2 - i * row_ins_spec.step;
+                  if(pos >= row_ins_spec.offsets &&  pos <= h - row_ins_spec.offsets){
+                    qty++;
+                  }
+                }
+              }
+              else{
+                for(let i = 1; i <= Math.ceil(h / row_ins_spec.step); i++){
+                  pos = i * row_ins_spec.step;
+                  if(pos >= row_ins_spec.offsets &&  pos <= h - row_ins_spec.offsets){
+                    qty++;
+                  }
+                }
+              }
+
+              if(qty){
                 row_spec = new_spec_row({elm, row_base: row_ins_spec, origin, spec, ox});
                 calc_qty_len(row_spec, row_ins_spec, w);
+                row_spec.qty *= qty;
                 calc_count_area_mass(row_spec, spec, _row, row_ins_spec.angle_calc_method);
               }
               row_spec = null;
@@ -3225,19 +3284,21 @@ $p.cat.users.__define({
 			  delete aobj.acl;
         const obj = new $p.CatUsers(aobj, this);
         const {_obj} = obj;
-        _obj._acl = acl;
-        obj._set_loaded();
-        Object.freeze(obj);
-        Object.freeze(_obj);
-        for(let j in _obj){
-          if(typeof _obj[j] == "object"){
-            Object.freeze(_obj[j]);
-            for(let k in _obj[j]){
-              typeof _obj[j][k] == "object" && Object.freeze(_obj[j][k]);
+        if(_obj){
+          _obj._acl = acl;
+          obj._set_loaded();
+          Object.freeze(obj);
+          Object.freeze(_obj);
+          for(let j in _obj){
+            if(typeof _obj[j] == "object"){
+              Object.freeze(_obj[j]);
+              for(let k in _obj[j]){
+                typeof _obj[j][k] == "object" && Object.freeze(_obj[j][k]);
+              }
             }
           }
+          res.push(obj);
         }
-				res.push(obj);
 			}
 			return res;
 		},
@@ -3382,36 +3443,10 @@ $p.CatUsers.prototype.__define({
 				.then(() => {
 
 					// рассчеты, помеченные, как шаблоны, загрузим в память заранее
-					setTimeout(() => {
-
-            if(!$p.job_prm.builder){
-              $p.job_prm.builder = {};
-            }
-						if(!$p.job_prm.builder.base_block){
-              $p.job_prm.builder.base_block = [];
-            }
-            if(!$p.job_prm.pricing){
-              $p.job_prm.pricing = {};
-            }
-
-						// дополним base_block шаблонами из систем профилей
-						$p.cat.production_params.forEach((o) => {
-							if(!o.is_folder)
-								o.base_blocks.forEach((row) => {
-									if($p.job_prm.builder.base_block.indexOf(row.calc_order) == -1){
-                    $p.job_prm.builder.base_block.push(row.calc_order);
-                  }
-								});
-						});
-
-						$p.job_prm.builder.base_block.forEach((o) => o.load());
-
-					}, 1000);
+					setTimeout($p.doc.calc_order.load_templates.bind($p.doc.calc_order), 1000);
 
 					// даём возможность завершиться другим обработчикам, подписанным на _pouch_load_data_loaded_
-					setTimeout(() => {
-						$p.eve.callEvent("predefined_elmnts_inited");
-					}, 200);
+					setTimeout(() => $p.eve.callEvent("predefined_elmnts_inited"), 200);
 
 				});
 
@@ -4486,6 +4521,43 @@ $p.doc.calc_order.on({
 	}
 });
 
+// метод загрузки шаблонов
+$p.doc.calc_order.load_templates = async function () {
+
+  if(!$p.job_prm.builder){
+    $p.job_prm.builder = {};
+  }
+  if(!$p.job_prm.builder.base_block){
+    $p.job_prm.builder.base_block = [];
+  }
+  if(!$p.job_prm.pricing){
+    $p.job_prm.pricing = {};
+  }
+
+  // дополним base_block шаблонами из систем профилей
+  $p.cat.production_params.forEach((o) => {
+    if(!o.is_folder)
+      o.base_blocks.forEach((row) => {
+        if($p.job_prm.builder.base_block.indexOf(row.calc_order) == -1){
+          $p.job_prm.builder.base_block.push(row.calc_order);
+        }
+      });
+  });
+
+  // загрузим шаблоны пачками по 10 документов
+  const refs = [];
+  for(let o of $p.job_prm.builder.base_block){
+    refs.push(o.ref);
+    if(refs.length > 9){
+      await $p.doc.calc_order.pouch_load_array(refs);
+      refs.length = 0;
+    }
+  }
+  return refs.length ? $p.doc.calc_order.pouch_load_array(refs) : undefined;
+
+  //$p.job_prm.builder.base_block.forEach((o) => o.load());
+};
+
 // свойства и методы объекта
 (() => {
 
@@ -4758,6 +4830,7 @@ $p.doc.calc_order.on({
         Ед: row.unit.name || "шт",
         Цвет: characteristic.clr.name,
         Размеры: row.len + "x" + row.width + ", " + row.s + "м²",
+        Площадь: row.s,
         Номенклатура: nom.name_full || nom.name,
         Характеристика: characteristic.name,
         Заполнения: "",
@@ -4906,6 +4979,8 @@ $p.doc.calc_order.on({
         for(let ts in mgr.metadata().tabular_sections){
           ox[ts].clear(true);
         }
+        ox.leading_elm = 0;
+        ox.leading_product = '';
         cx = Promise.resolve(ox);
       });
 
@@ -7124,6 +7199,8 @@ class ProductsBuilding {
       if(!b.cnn || !e.cnn){
         return;
       }
+      b.check_err();
+      e.check_err();
 
       const prev = b.profile;
       const next = e.profile;
@@ -7264,12 +7341,59 @@ class ProductsBuilding {
     }
 
     /**
-     * Спецификация заполнения
-     * @param glass {Filling}
+     * Спецификация сечения (водоотлива)
+     * @param elm {Sectional}
      */
-    function base_spec_glass(glass) {
+    function base_spec_sectional(elm) {
 
-      const {profiles, imposts, _row} = glass;
+      const {_row, _attr, inset, layer} = elm;
+
+      if(_row.nom.empty() || _row.nom.is_service || _row.nom.is_procedure || _row.clr == $p.cat.clrs.predefined('НеВключатьВСпецификацию')){
+        return;
+      }
+
+      // во время расчетов возможна подмена объекта спецификации
+      const spec_tmp = spec;
+
+      // спецификация вставки
+      inset.calculate_spec({elm, ox});
+
+      // спецификация вложенных в элемент вставок
+      ox.inserts.find_rows({cnstr: -elm.elm}, ({inset, clr}) => {
+
+        // если во вставке указано создавать продукцию, создаём
+        if(inset.is_order_row == $p.enm.specification_order_row_types.Продукция){
+          // характеристику ищем в озу, в indexeddb не лезем, если нет в озу - создаём и дозаполняем реквизиты характеристики
+          const cx = ox.find_create_cx(elm.elm, inset.ref)._mixin(inset.contour_attrs(layer));
+          ox._order_rows.push(cx);
+          spec = cx.specification.clear(true);
+        }
+
+        // рассчитаем спецификацию вставки
+        const len_angl = {
+          angle: 0,
+          alp1: 0,
+          alp2: 0,
+          len: 0,
+          origin: inset,
+          cnstr: layer.cnstr
+        }
+        inset.calculate_spec({elm, len_angl, ox, spec});
+
+      });
+
+      // восстанавливаем исходную ссылку объекта спецификации
+      spec = spec_tmp;
+
+    }
+
+    /**
+     * Спецификация заполнения
+     * @param elm {Filling}
+     */
+    function base_spec_glass(elm) {
+
+      const {profiles, imposts, _row} = elm;
 
       if(_row.clr == $p.cat.clrs.predefined('НеВключатьВСпецификацию')){
         return;
@@ -7304,19 +7428,18 @@ class ProductsBuilding {
       }
 
       // добавляем спецификацию вставки в заполнение
-      glass.inset.calculate_spec({elm: glass, ox});
+      elm.inset.calculate_spec({elm, ox});
 
       // для всех раскладок заполнения
       imposts.forEach(base_spec_profile);
 
       // спецификация вложенных в элемент вставок
-      ox.inserts.find_rows({cnstr: -glass.elm}, ({inset, clr}) => {
-
+      ox.inserts.find_rows({cnstr: -elm.elm}, ({inset, clr}) => {
         // если во вставке указано создавать продукцию, создаём
         if(inset.is_order_row == $p.enm.specification_order_row_types.Продукция){
           $p.record_log("inset_elm_spec: specification_order_row_types.Продукция");
         }
-        inset.calculate_spec({elm: glass, ox});
+        inset.calculate_spec({elm, ox});
       });
     }
 
@@ -7337,7 +7460,7 @@ class ProductsBuilding {
           // характеристику ищем в озу, в indexeddb не лезем, если нет в озу - создаём и дозаполняем реквизиты характеристики
           const cx = ox.find_create_cx(-contour.cnstr, inset.ref)._mixin(inset.contour_attrs(contour));
           ox._order_rows.push(cx);
-          spec = cx.specification.clear();
+          spec = cx.specification.clear(true);
         }
 
         // рассчитаем спецификацию вставки
@@ -7345,7 +7468,7 @@ class ProductsBuilding {
           _row: {},
           elm: 0,
           clr: clr,
-          get perimeter() {return contour.perimeter},
+          layer: contour,
         };
         const len_angl = {
           angle: 0,
@@ -7369,25 +7492,43 @@ class ProductsBuilding {
      */
     function base_spec(scheme) {
 
+      const {Contour, Filling, Sectional, Profile, ProfileConnective} = $p.Editor;
+
       // сбрасываем структуру обработанных соединений
       added_cnn_spec = {};
 
       // для всех контуров изделия
-      scheme.getItems({class: $p.Editor.Contour}).forEach((contour) => {
+      scheme.getItems({class: Contour}).forEach((contour) => {
 
-        // для всех профилей контура
-        contour.profiles.forEach(base_spec_profile);
-
-        // для всех заполнений контура
-        contour.glasses(false, true).forEach(base_spec_glass);
+        for(let elm of contour.children){
+          if(elm instanceof Filling){
+            // для всех заполнений контура
+            base_spec_glass(elm);
+          }
+          else if(elm instanceof Sectional){
+            // для всех разрезов (водоотливов)
+            base_spec_sectional(elm);
+          }
+          else if(elm instanceof Profile){
+            // для всех профилей контура
+            base_spec_profile(elm);
+          }
+        }
 
         // фурнитура контура
         furn_spec(contour);
 
         // спецификация вставок в контур
-        inset_contour_spec(contour)
+        inset_contour_spec(contour);
 
       });
+
+      // для всех соединительных профилей
+      for(let elm of scheme.l_connective.children){
+        if(elm instanceof ProfileConnective){
+          base_spec_profile(elm);
+        }
+      }
 
       // спецификация вставок в изделие
       inset_contour_spec({
@@ -7711,7 +7852,7 @@ class SpecBuilding {
     const order_rows = new Map();
     const adel = [];
     const ox = calc_order_row.characteristic;
-    const nom = ox.empty() ? calc_order_row.nom : ox.owner;
+    const nom = ox.empty() ? calc_order_row.nom : (calc_order_row.nom = ox.owner);
 
     // типы цен получаем заранее, т.к. они могут пригодиться при расчете корректировки спецификации
     $p.pricing.price_type(attr);

@@ -18,13 +18,14 @@ function getBody(req){
 async function calc_order(ctx, next) {
 
   const res = {ref: ctx.route.params.ref, production: []};
-  const o = await $p.doc.calc_order.get(res.ref, 'promise');
   const dp = $p.dp.buyers_order.create();
   const query = await getBody(ctx.req);
 
   try{
-    let prod;
+    const o = await $p.doc.calc_order.get(res.ref, 'promise');
     dp.calc_order = o;
+
+    let prod;
     if(o.is_new()){
       o._manager.emit('after_create', o, {});
     }
