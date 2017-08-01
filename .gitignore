@@ -3,3 +3,4 @@
 src/modifiers/
 localstorage/
 node_modules/
+/config/test.env

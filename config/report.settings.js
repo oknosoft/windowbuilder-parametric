@@ -16,7 +16,7 @@ module.exports = (prm) => {
     // авторизация couchdb
     user_node: {
       username: process.env.DBUSER || 'admin',
-      password: process.env.DBPWD || 'admin'
+      password: process.env.DBPWD || 'admin',
     },
 
     couch_direct: true,
