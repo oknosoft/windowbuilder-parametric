@@ -1,4 +1,3 @@
-
 // дополняем прототип Object методами observe
 require('./observe');
 
@@ -18,7 +17,6 @@ require('./dhtmlx_eve')($p);
 
 // обеспечиваем совместимость DataManager с v0.12
 require('./meta_pouchdb')($p.classes.DataManager.prototype);
-
 
 
 // инициализируем параметры сеанса и метаданные
@@ -50,25 +48,25 @@ require('./meta_pouchdb')($p.classes.DataManager.prototype);
 
   pouch.on({
     user_log_in(name) {
-      debug(`logged in ${name}`)
+      debug(`logged in ${name}`);
     },
     user_log_fault(err) {
-      debug(`login error ${err}`)
+      debug(`login error ${err}`);
     },
     pouch_load_start(page) {
-      debug('loadind to ram: start')
+      debug('loadind to ram: start');
     },
     pouch_data_page(page) {
-      debug(`loadind to ram: page${page.page}, written${page.docs_written}`)
+      debug(`loadind to ram: page №${page.page}, written ${page.docs_written} docs`);
     },
     pouch_data_loaded(page) {
-      debug('loadind to ram: loaded')
+      debug(`loadind to ram: READY, written ${page.docs_written} docs`);
     },
     pouch_doc_ram_loaded() {
       pouch.local.ram.changes({
         since: 'now',
         live: true,
-        include_docs: true
+        include_docs: true,
       }).on('change', (change) => {
         // формируем новый
         pouch.load_changes({docs: [change.doc]});
@@ -77,7 +75,7 @@ require('./meta_pouchdb')($p.classes.DataManager.prototype);
       });
       debug(`ready to receive queries, listen on port ${process.env.PORT || 3000}`);
     },
-  })
+  });
 
 })();
 
