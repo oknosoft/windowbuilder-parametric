@@ -10,24 +10,34 @@ function getBody(req){
   return new Promise((resolve,reject) => {
     let data = '';
     req.on('data', (chunk) => data += chunk);
-    req.on('end', (chunk) => resolve(JSON.parse(data)));
+    req.on('end', (chunk) => {
+      try{
+        resolve(JSON.parse(data.charCodeAt(0) == 65279 ? data.substr(1) : data))
+      }
+      catch(err){
+        reject(err);
+      }
+
+    });
   })
 }
 
 // формирует json описания продукции заказа
 async function calc_order(ctx, next) {
 
-  const res = {ref: ctx.route.params.ref, production: []};
-  const dp = $p.dp.buyers_order.create();
-  const query = await getBody(ctx.req);
-
   try{
+
+    const res = {ref: ctx.route.params.ref, production: []};
+    const dp = $p.dp.buyers_order.create();
+
+    const query = await getBody(ctx.req);
+
     const o = await $p.doc.calc_order.get(res.ref, 'promise');
     dp.calc_order = o;
 
     let prod;
     if(o.is_new()){
-      o._manager.emit('after_create', o, {});
+      o.after_create();
     }
     else{
       if(o.posted){
@@ -36,8 +46,9 @@ async function calc_order(ctx, next) {
         return o.unload();
       }
       prod = await o.load_production();
-      o.production.clear(true);
+      o.production.clear();
     }
+    o._data._loading = true;
     o.date = $p.utils.moment(query.date).toDate();
     if(query.partner){
       o.partner = query.partner;
@@ -50,9 +61,11 @@ async function calc_order(ctx, next) {
       const prow = dp.production.add(row);
       prow.inset = row.nom;
     }
+
     const ax = await o.process_add_product_list(dp);
     await Promise.all(ax);
     await o.save();
+    o._data._loading = true;
     for(let row of o._obj.production){
       const ox = $p.cat.characteristics.get(row.characteristic);
       row.clr = ox && ox.clr ? ox.clr.ref : '';
