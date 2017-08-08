@@ -48,7 +48,7 @@ require('./meta_pouchdb')($p.classes.DataManager.prototype);
 
   pouch.on({
     user_log_in(name) {
-      debug(`logged in ${name}`);
+      debug(`logged in ${$p.job_prm.couch_local}, user:${name}, zone:${$p.job_prm.zone}`);
     },
     user_log_fault(err) {
       debug(`login error ${err}`);
@@ -59,8 +59,8 @@ require('./meta_pouchdb')($p.classes.DataManager.prototype);
     pouch_data_page(page) {
       debug(`loadind to ram: page №${page.page}, written ${page.docs_written} docs`);
     },
-    pouch_data_loaded(page) {
-      debug(`loadind to ram: READY, written ${page.docs_written} docs`);
+    pouch_complete_loaded(page) {
+      debug(`ready to receive queries, listen on port: ${process.env.PORT || 3000}`);
     },
     pouch_doc_ram_loaded() {
       pouch.local.ram.changes({
@@ -73,7 +73,7 @@ require('./meta_pouchdb')($p.classes.DataManager.prototype);
       }).on('error', (err) => {
         // handle errors
       });
-      debug(`ready to receive queries, listen on port ${process.env.PORT || 3000}`);
+      debug(`loadind to ram: READY`);
     },
   });
 
