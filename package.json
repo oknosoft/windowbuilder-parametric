@@ -12,15 +12,15 @@
   "scripts": {
     "start": "node ./index",
     "meta:prebuild": "node ./scripts/prebuild.meta",
-    "meta:link": "npm link metadata-core metadata-redux metadata-pouchdb metadata-abstract-ui metadata-react-ui"
+    "meta:link": "npm link metadata-core metadata-redux metadata-pouchdb metadata-abstract-ui metadata-react"
   },
   "dependencies": {
     "alasql": "^0.4.1",
     "koa": "^2.3.0",
     "koa-better-router": "^2.1",
-    "metadata-abstract-ui": "^2.0.1-beta.19",
-    "metadata-core": "^2.0.1-beta.19",
-    "metadata-pouchdb": "^2.0.1-beta.19",
+    "metadata-abstract-ui": "^2.0.1-beta.20",
+    "metadata-core": "^2.0.1-beta.20",
+    "metadata-pouchdb": "^2.0.1-beta.20",
     "moment": "^2.18",
     "pouchdb": "^6.3.4",
     "pouchdb-adapter-http": "^6.3.4",
@@ -35,7 +35,7 @@
   },
   "devDependencies": {
     "clipboard": "^1.7",
-    "debug": "^2.6",
+    "debug": "^3.0.0",
     "eslint": "^4.4.1",
     "eslint-config-standard": "^10.2",
     "eslint-config-standard-react": "^5.0",

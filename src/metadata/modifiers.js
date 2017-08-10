@@ -2768,6 +2768,7 @@ $p.CatNom.prototype.__define({
       }
 
       const {_price} = this._data;
+      const {x, y, z, clr, ref, calc_order} = (attr.characteristic || {});
 
 			if(!attr.characteristic){
         attr.characteristic = $p.utils.blank.guid;
@@ -2775,7 +2776,6 @@ $p.CatNom.prototype.__define({
 			else if($p.utils.is_data_obj(attr.characteristic)){
 			  // если передали уникальную характеристику продкции - ищем простую с тем же цветом и размерами
         // TODO: здесь было бы полезно учесть соответствие цветов??
-        const {x, y, z, clr, ref, calc_order} = attr.characteristic;
         attr.characteristic = ref;
         if(!calc_order.empty()){
           const tmp = [];
@@ -2856,8 +2856,7 @@ $p.CatNom.prototype.__define({
           nom: this,
           characteristic: $p.cat.characteristics.get(attr.characteristic, false),
           date: attr.date,
-          price: price,
-          currency: currency
+          price, currency, x, y, z, clr, calc_order,
         })
       }
 
@@ -4515,6 +4514,9 @@ $p.DocCalc_order = class DocCalc_order extends $p.DocCalc_order {
       ВсегоИзделий: 0,
       ВсегоПлощадьИзделий: 0,
       Продукция: [],
+      НомерВнутр: this.number_internal,
+      КлиентДилера: this.client_of_dealer,
+      Комментарий: this.note,
     };
 
 
@@ -4813,27 +4815,27 @@ $p.DocCalc_order = class DocCalc_order extends $p.DocCalc_order {
           ox.clr = row_spec.clr;
           ox.note = row_spec.note;
 
-          // устанавливаем свойства в строке заказа
-          Object.assign(row._obj, {
-            characteristic: ox.ref,
-            nom: ox.owner.ref,
-            unit: ox.owner.storage_unit.ref,
-            len: ox.x,
-            width: ox.y,
-            s: ox.s,
-            qty: row_spec.quantity || 1,
-            quantity: row_spec.quantity || 1,
-            note: ox.note,
-          });
-
           if(params) {
             params.find_rows({elm: row_spec.row}, (prow) => {
               ox.params.add(prow, true);
             });
           }
-
-          ox.name = ox.prod_name();
         }
+
+        // устанавливаем свойства в строке заказа
+        Object.assign(row._obj, {
+          characteristic: ox.ref,
+          nom: ox.owner.ref,
+          unit: ox.owner.storage_unit.ref,
+          len: ox.x,
+          width: ox.y,
+          s: ox.s,
+          qty: (row_spec && row_spec.quantity) || 1,
+          quantity: (row_spec && row_spec.quantity) || 1,
+          note: ox.note,
+        });
+
+        ox.name = ox.prod_name();
 
         // записываем расчет, если не сделали этого ранее, чтобы не погибла ссылка на расчет в характеристике
         return this.is_new() ? this.save().then(() => row) : row;
@@ -6404,7 +6406,7 @@ class Pricing {
       discount_external: 10,
       extra_charge_external: 0,
       price_type_first_cost: $p.job_prm.pricing.price_type_first_cost,
-      price_type_sale: $p.job_prm.pricing.price_type_first_cost,
+      price_type_sale: $p.job_prm.pricing.price_type_sale,
       price_type_internal: $p.job_prm.pricing.price_type_first_cost,
       formula: empty_formula,
       sale_formula: empty_formula,
@@ -7543,8 +7545,8 @@ class ProductsBuilding {
         // сохраняем картинку вместе с изделием
         ox.save(undefined, undefined, {
           svg: {
-            "content_type": "image/svg+xml",
-            "data": new Blob([scheme.get_svg()], {type: "image/svg+xml"})
+            content_type: "image/svg+xml",
+            data: new Blob([scheme.get_svg()], {type: "image/svg+xml"})
           }
         })
           .then(() => {

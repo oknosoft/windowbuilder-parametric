@@ -37,7 +37,7 @@ async function calc_order(ctx, next) {
 
     let prod;
     if(o.is_new()) {
-      o.after_create();
+      await o.after_create();
     }
     else {
       if(o.posted) {
@@ -82,6 +82,11 @@ async function calc_order(ctx, next) {
     for (let row of o._obj.production) {
       const ox = $p.cat.characteristics.get(row.characteristic);
       row.clr = ox && ox.clr ? ox.clr.ref : '';
+      row.clr_name = ox && ox.clr ? ox.clr.name : '';
+      row.vat_rate = row.vat_rate.valueOf();
+      row.nom_name = $p.cat.nom.get(row.nom).toString();
+      row.unit_name = $p.cat.nom_units.get(row.unit).toString();
+      row.product_name = ox ? ox.toString() : '';
       for (let fld of ['margin', 'price_internal', 'amount_internal', 'marginality', 'first_cost', 'discount', 'discount_percent',
         'discount_percent_internal', 'changed', 'ordn', 'characteristic']) {
         delete row[fld];

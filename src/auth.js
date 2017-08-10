@@ -11,7 +11,7 @@ module.exports = async (ctx, $p) => {
     return;
   }
 
-  const {authorization, suffix} = ctx.req.headers;
+  let {authorization, suffix} = ctx.req.headers;
   if(!authorization || !suffix){
     ctx.status = 403;
     ctx.body = 'access denied';
@@ -23,6 +23,10 @@ module.exports = async (ctx, $p) => {
 
     const auth = new Buffer(authorization.substr(6), 'base64').toString();
     const sep = auth.indexOf(':');
+
+    while (suffix.length < 4){
+      suffix = '0' + suffix;
+    }
 
     request({
       url: couch_local + zone + '_doc_' + suffix,
