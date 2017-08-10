@@ -88,7 +88,7 @@ async function calc_order(ctx, next) {
       row.unit_name = $p.cat.nom_units.get(row.unit).toString();
       row.product_name = ox ? ox.toString() : '';
       for (let fld of ['margin', 'price_internal', 'amount_internal', 'marginality', 'first_cost', 'discount', 'discount_percent',
-        'discount_percent_internal', 'changed', 'ordn', 'characteristic']) {
+        'discount_percent_internal', 'changed', 'ordn', 'characteristic', 'qty']) {
         delete row[fld];
       }
       if(ox && !ox.empty() && !ox.is_new() && !ox.calc_order.empty()) {
