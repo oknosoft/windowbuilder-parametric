@@ -5,11 +5,9 @@
  */
 
 const gulp = require('gulp'),
-	base64 = require('gulp-base64'),
 	concat = require('gulp-concat'),
   strip = require('gulp-strip-comments'),
 	rename = require('gulp-rename'),
-	umd = require('gulp-umd'),
   wrap = require("gulp-wrap");
 
 module.exports = gulp;
