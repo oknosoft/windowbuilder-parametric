@@ -44,6 +44,7 @@ require('./meta_pouchdb')($p.classes.DataManager.prototype);
   // загружаем кешируемые справочники в ram и начинаем следить за изменениями ram
   const {pouch} = $p.adapters;
   pouch.log_in(user_node.username, user_node.password)
+    .then(() => pouch.load_data())
     .catch((err) => debug(err));
 
   pouch.on({
@@ -57,7 +58,7 @@ require('./meta_pouchdb')($p.classes.DataManager.prototype);
       debug('loadind to ram: start');
     },
     pouch_data_page(page) {
-      debug(`loadind to ram: page №${page.page}, written ${page.docs_written} docs`);
+      debug(`loadind to ram: page №${page.page} (${page.page * page.limit} from ${page.total_rows})`);
     },
     pouch_complete_loaded(page) {
       debug(`ready to receive queries, listen on port: ${process.env.PORT || 3000}`);
