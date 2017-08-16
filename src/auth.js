@@ -19,10 +19,13 @@ module.exports = async (ctx, $p) => {
   }
 
   const {couch_local, zone} = $p.job_prm;
+  let user;
   const resp = await new Promise((resolve, reject) => {
 
     const auth = new Buffer(authorization.substr(6), 'base64').toString();
     const sep = auth.indexOf(':');
+    const pass = auth.substr(sep + 1);
+    user = auth.substr(0, sep);
 
     while (suffix.length < 4){
       suffix = '0' + suffix;
@@ -30,14 +33,11 @@ module.exports = async (ctx, $p) => {
 
     request({
       url: couch_local + zone + '_doc_' + suffix,
-      auth: {
-        user: auth.substr(0, sep),
-        pass: auth.substr(sep + 1),
-        sendImmediately: true
+      auth: {user, pass, sendImmediately: true
       }
     }, (e, r, body) => {
       if(r && r.statusCode < 201){
-        $p.wsql.set_user_param("user_name", auth.substr(0, sep));
+        $p.wsql.set_user_param("user_name", user);
         resolve(true);
       }
       else{
@@ -48,6 +48,6 @@ module.exports = async (ctx, $p) => {
     });
   });
 
-  return resp;
+  return {user: $p.cat.users.by_id(user) , suffix, resp};
 
 };

@@ -17,13 +17,12 @@ function getBody(req) {
       catch (err) {
         reject(err);
       }
-
     });
   });
 }
 
 // формирует json описания продукции заказа
-async function calc_order(ctx, next) {
+async function calc_order(ctx, next, authorization) {
 
   try {
 
@@ -112,30 +111,62 @@ async function calc_order(ctx, next) {
 }
 
 // формирует json описания продукций массива заказов
-async function array(ctx, next) {
+async function array(ctx, next, authorization) {
 
   ctx.body = `Prefix: ${ctx.route.prefix}, path: ${ctx.route.path}`;
   //ctx.body = res;
 }
 
+// сохраняет объект в локальном хранилище отдела абонента
+async function store(ctx, next, authorization) {
+  let query = await getBody(ctx.req);
+  if(typeof query == 'object'){
+    const {doc} = $p.adapters.pouch.remote;
+    if(Array.isArray(query)){
+      query = {rows: query};
+    }
+    query._id = `_local/store${authorization.suffix}/${ctx.params.ref || 'mapping'}`;
+    ctx.body = await doc.get(query._id)
+      .catch((err) => null)
+      .then((rev) => {
+      if(rev){
+        query._rev = rev._rev
+      }
+    })
+      .then(() => doc.put(query));
+  }
+}
+
 module.exports = async (ctx, next) => {
 
   // проверяем ограничение по ip и авторизацию
-  if(!await auth(ctx, $p)) {
+  const authorization = await auth(ctx, $p);
+  if(!authorization){
     return;
   }
 
   try {
     switch (ctx.params.class) {
     case 'doc.calc_order':
-      return await calc_order(ctx, next);
+      return await calc_order(ctx, next, authorization);
     case 'array':
-      return await array(ctx, next);
+      return await array(ctx, next, authorization);
+    case 'store':
+      return await store(ctx, next, authorization);
+    default:
+      ctx.status = 404;
+      ctx.body = {
+        error: true,
+        message: `Неизвестный класс ${ctx.params.class}`,
+      };
     }
   }
   catch (err) {
     ctx.status = 500;
-    ctx.body = err.stack;
+    ctx.body = {
+      error: true,
+      message: err.stack || err.message,
+    };
     debug(err);
   }
 

@@ -7,9 +7,9 @@ const auth = require('./auth');
 debug('required');
 
 // формирует json описания продукции заказа
-async function calc_order(ctx, next) {
+async function calc_order(ctx, next, authorization) {
 
-  const {ref} = ctx.route.params;
+  const {ref} = ctx.params;
   const o = await $p.doc.calc_order.get(ref, 'promise');
 
   if(o.is_new()){
@@ -49,7 +49,14 @@ async function calc_order(ctx, next) {
   o.unload();
 }
 
-async function cat(ctx, next) {
+async function store(ctx, next, authorization) {
+  const _id = `_local/store${authorization.suffix}/${ctx.params.ref || 'mapping'}`;
+  ctx.body = await $p.adapters.pouch.remote.doc.get(_id)
+    .catch((err) => null)
+    .then((doc) => doc || {error: true, message: `Объект ${_id} не найден`});
+}
+
+async function cat(ctx, next, authorization) {
 
   const predefined_names = ['БезЦвета', 'Белый'];
   const {clrs, inserts, nom, partners, users} = $p.cat;
@@ -74,7 +81,7 @@ async function cat(ctx, next) {
   };
 
   // подклеиваем контрагентов
-  for(let o of $p.current_user._obj.acl_objs.filter((o) => o.type == 'cat.partners')){
+  for(let o of authorization.user._obj.acl_objs.filter((o) => o.type == 'cat.partners')){
     const p = await partners.get(o.acl_obj, 'promise');
     res.partners.push({
       ref: p.ref,
@@ -121,23 +128,35 @@ async function array(ctx, next) {
 module.exports = async (ctx, next) => {
 
   // проверяем ограничение по ip и авторизацию
-  if(!await auth(ctx, $p)){
+  const authorization = await auth(ctx, $p);
+  if(!authorization){
     return;
   }
 
   try{
     switch (ctx.params.class){
-      case 'doc.calc_order':
-        return await calc_order(ctx, next);
-      case 'cat':
-        return await cat(ctx, next);
-      case 'array':
-        return await array(ctx, next);
+    case 'doc.calc_order':
+      return await calc_order(ctx, next, authorization);
+    case 'cat':
+      return await cat(ctx, next, authorization);
+    case 'store':
+      return await store(ctx, next, authorization);
+    case 'array':
+      return await array(ctx, next, authorization);
+    default:
+      ctx.status = 404;
+      ctx.body = {
+        error: true,
+        message: `Неизвестный класс ${ctx.params.class}`,
+      };
     }
   }
   catch(err){
     ctx.status = 500;
-    ctx.body = err.stack;
+    ctx.body = {
+      error: true,
+      message: err.stack || err.message,
+    };
     debug(err);
   }
 
