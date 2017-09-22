@@ -69,15 +69,15 @@ async function cat(ctx, next, authorization) {
         id: o.id ? o.id.pad(3) : "000",
         name: o.name,
       })),
-    // вставки
-    inserts: inserts.alatable.map((o) => ({
+    // номенклатура и вставки
+    nom: inserts.alatable.map((o) => ({
       ref: o.ref,
+      id: o.id,
       name: o.name,
+      article: o.article || '',
     })),
     // контрагенты
     partners: [],
-    // номенклатура
-    nom: [],
   };
 
   // подклеиваем контрагентов
@@ -92,12 +92,12 @@ async function cat(ctx, next, authorization) {
   }
 
   // подклеиваем номенклатуру
-  const {integration} = $p.job_prm.nom;
+  const {outer} = $p.job_prm.nom;
   nom.forEach((o) => {
     if(o.is_folder){
       return;
     }
-    for(let inom of integration){
+    for(let inom of outer){
       if(o._hierarchy(inom)){
         res.nom.push({
           ref: o.ref,

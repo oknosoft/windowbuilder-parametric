@@ -22,10 +22,10 @@ module.exports = function settings(prm) {
 
     // расположение couchdb
     couch_path: process.env.COUCHPATH || "/couchdb/wb_",
-    //couch_path: "https://light.oknosoft.ru/couchdb/wb_",
+    //couch_path: "https://light.oknosoft.ru/couchdb/wb_" || "http://cou200:5984/wb_",
 
     // расположение couchdb для nodejs
-    couch_local: process.env.COUCHLOCAL || "http://cou200:5984/wb_" || "https://crystallit.oknosoft.ru/couchdb/wb_",
+    couch_local: process.env.COUCHLOCAL || "https://crystallit.oknosoft.ru/couchdb/wb_",
 
     pouch_filter: {
       meta: "auth/meta"
