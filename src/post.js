@@ -3,6 +3,7 @@
 const debug = require('debug')('wb:post');
 const $p = require('./metadata');
 const auth = require('./auth');
+const {serialize_prod} = require('./get');
 
 debug('required');
 
@@ -49,10 +50,12 @@ async function calc_order(ctx, next, authorization) {
     }
     o._data._loading = true;
     o.date = $p.utils.moment(query.date).toDate();
+    o.number_internal = query.number_doc;
+    o.obj_delivery_state = query.obj_delivery_state == 'Отозван' ? 'Отозван' : (query.obj_delivery_state == 'Черновик' ? 'Черновик' : 'Отправлен');
     if(query.partner) {
       o.partner = query.partner;
     }
-    if(o.contract.empty()) {
+    if(o.contract.empty() || query.partner) {
       o.contract = $p.cat.contracts.by_partner_and_org(o.partner, o.organization);
     }
     o.vat_consider = o.vat_included = true;
@@ -77,29 +80,7 @@ async function calc_order(ctx, next, authorization) {
     const ax = await o.process_add_product_list(dp);
     await Promise.all(ax);
     await o.save();
-    o._data._loading = true;
-    for (let row of o._obj.production) {
-      const ox = $p.cat.characteristics.get(row.characteristic);
-      row.clr = ox && ox.clr ? ox.clr.ref : '';
-      row.clr_name = ox && ox.clr ? ox.clr.name : '';
-      row.vat_rate = row.vat_rate.valueOf();
-      row.nom_name = $p.cat.nom.get(row.nom).toString();
-      row.unit_name = $p.cat.nom_units.get(row.unit).toString();
-      row.product_name = ox ? ox.toString() : '';
-      for (let fld of ['margin', 'price_internal', 'amount_internal', 'marginality', 'first_cost', 'discount', 'discount_percent',
-        'discount_percent_internal', 'changed', 'ordn', 'characteristic', 'qty']) {
-        delete row[fld];
-      }
-      if(ox && !ox.empty() && !ox.is_new() && !ox.calc_order.empty()) {
-        ox.unload();
-      }
-    }
-    ctx.body = JSON.stringify(o);
-    prod && prod.forEach((cx) => {
-      if(!cx.empty() && !cx.is_new() && !cx.calc_order.empty()) {
-        cx.unload();
-      }
-    });
+    serialize_prod({o, prod, ctx});
     o.unload();
   }
   catch (err) {

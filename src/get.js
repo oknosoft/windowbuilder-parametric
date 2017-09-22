@@ -6,6 +6,41 @@ const auth = require('./auth');
 
 debug('required');
 
+function serialize_prod({o, prod, ctx}) {
+  const flds = ['margin', 'price_internal', 'amount_internal', 'marginality', 'first_cost', 'discount', 'discount_percent',
+    'discount_percent_internal', 'changed', 'ordn', 'characteristic', 'qty'];
+  for(let row of o._obj.production){
+    const ox = $p.cat.characteristics.get(row.characteristic);
+    const nom = $p.cat.nom.get(row.nom);
+    if(ox){
+      row.clr = ox.clr ? ox.clr.ref : '';
+      row.clr_name = ox.clr ? ox.clr.name : '';
+      if(!ox.origin.empty()){
+        row.nom = ox.origin.ref;
+      }
+    }
+    else{
+      row.clr = row.clr_name = '';
+    }
+    row.vat_rate = row.vat_rate.valueOf();
+    row.nom_name = nom.toString();
+    row.unit_name = $p.cat.nom_units.get(row.unit).toString();
+    row.product_name = ox ? ox.toString() : '';
+    for (let fld of flds) {
+      delete row[fld];
+    }
+    if(ox && !ox.empty() && !ox.is_new() && !ox.calc_order.empty()) {
+      ox.unload();
+    }
+  }
+  ctx.body = JSON.stringify(o);
+  prod.forEach((cx) => {
+    if (!cx.empty() && !cx.is_new() && !cx.calc_order.empty()) {
+      cx.unload();
+    }
+  });
+}
+
 // формирует json описания продукции заказа
 async function calc_order(ctx, next, authorization) {
 
@@ -23,28 +58,7 @@ async function calc_order(ctx, next, authorization) {
   }
   else{
     const prod = await o.load_production();
-    for(let row of o._obj.production){
-      const ox = $p.cat.characteristics.get(row.characteristic);
-      row.clr = ox && ox.clr ? ox.clr.ref : '';
-      row.clr_name = ox && ox.clr ? ox.clr.name : '';
-      row.vat_rate = row.vat_rate.valueOf();
-      row.nom_name = $p.cat.nom.get(row.nom).toString();
-      row.unit_name = $p.cat.nom_units.get(row.unit).toString();
-      row.product_name = ox ? ox.toString() : '';
-      for (let fld of ['margin', 'price_internal', 'amount_internal', 'marginality', 'first_cost', 'discount', 'discount_percent',
-        'discount_percent_internal', 'changed', 'ordn', 'characteristic', 'qty']) {
-        delete row[fld];
-      }
-      if(ox && !ox.empty() && !ox.is_new() && !ox.calc_order.empty()) {
-        ox.unload();
-      }
-    }
-    ctx.body = JSON.stringify(o);
-    prod.forEach((cx) => {
-      if (!cx.empty() && !cx.is_new() && !cx.calc_order.empty()) {
-        cx.unload();
-      }
-    });
+    serialize_prod({o, prod, ctx});
   }
   o.unload();
 }
@@ -70,7 +84,7 @@ async function cat(ctx, next, authorization) {
         name: o.name,
       })),
     // номенклатура и вставки
-    nom: inserts.alatable.map((o) => ({
+    nom: inserts.alatable.filter((o) => o.ref !== $p.utils.blank.guid).map((o) => ({
       ref: o.ref,
       id: o.id,
       name: o.name,
@@ -94,7 +108,7 @@ async function cat(ctx, next, authorization) {
   // подклеиваем номенклатуру
   const {outer} = $p.job_prm.nom;
   nom.forEach((o) => {
-    if(o.is_folder){
+    if(o.is_folder || o.empty()){
       return;
     }
     for(let inom of outer){
@@ -161,3 +175,5 @@ module.exports = async (ctx, next) => {
   }
 
 };
+
+module.exports.serialize_prod = serialize_prod;
