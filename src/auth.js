@@ -22,32 +22,39 @@ module.exports = async (ctx, $p) => {
   let user;
   const resp = await new Promise((resolve, reject) => {
 
-    const auth = new Buffer(authorization.substr(6), 'base64').toString();
-    const sep = auth.indexOf(':');
-    const pass = auth.substr(sep + 1);
-    user = auth.substr(0, sep);
+    try{
+      const auth = new Buffer(authorization.substr(6), 'base64').toString();
+      const sep = auth.indexOf(':');
+      const pass = auth.substr(sep + 1);
+      user = auth.substr(0, sep);
 
-    while (suffix.length < 4){
-      suffix = '0' + suffix;
+      while (suffix.length < 4){
+        suffix = '0' + suffix;
+      }
+
+      request({
+        url: couch_local + zone + '_doc_' + suffix,
+        auth: {user, pass, sendImmediately: true
+        }
+      }, (e, r, body) => {
+        if(r && r.statusCode < 201){
+          $p.wsql.set_user_param("user_name", user);
+          resolve(true);
+        }
+        else{
+          ctx.status = (r && r.statusCode) || 500;
+          ctx.body = body || (e && e.message);
+          resolve(false);
+        }
+      });
     }
-
-    request({
-      url: couch_local + zone + '_doc_' + suffix,
-      auth: {user, pass, sendImmediately: true
-      }
-    }, (e, r, body) => {
-      if(r && r.statusCode < 201){
-        $p.wsql.set_user_param("user_name", user);
-        resolve(true);
-      }
-      else{
-        ctx.status = (r && r.statusCode) || 500;
-        ctx.body = body || (e && e.message);
-        resolve(false);
-      }
-    });
+    catch(e){
+      ctx.status = 500;
+      ctx.body = e.message;
+      resolve(false);
+    }
   });
 
-  return {user: $p.cat.users.by_id(user) , suffix, resp};
+  return resp && {user: $p.cat.users.by_id(user) , suffix};
 
 };

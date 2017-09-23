@@ -2,7 +2,6 @@
 
 const debug = require('debug')('wb:get');
 const $p = require('./metadata');
-const auth = require('./auth');
 
 debug('required');
 
@@ -42,7 +41,7 @@ function serialize_prod({o, prod, ctx}) {
 }
 
 // формирует json описания продукции заказа
-async function calc_order(ctx, next, authorization) {
+async function calc_order(ctx, next) {
 
   const {ref} = ctx.params;
   const o = await $p.doc.calc_order.get(ref, 'promise');
@@ -63,14 +62,20 @@ async function calc_order(ctx, next, authorization) {
   o.unload();
 }
 
-async function store(ctx, next, authorization) {
-  const _id = `_local/store${authorization.suffix}/${ctx.params.ref || 'mapping'}`;
+async function store(ctx, next) {
+  // данные авторизации получаем из контекста
+  const {_auth} = ctx;
+
+  const _id = `_local/store${_auth.suffix}/${ctx.params.ref || 'mapping'}`;
   ctx.body = await $p.adapters.pouch.remote.doc.get(_id)
     .catch((err) => null)
     .then((doc) => doc || {error: true, message: `Объект ${_id} не найден`});
 }
 
-async function cat(ctx, next, authorization) {
+async function cat(ctx, next) {
+
+  // данные авторизации получаем из контекста
+  const {_auth} = ctx;
 
   const predefined_names = ['БезЦвета', 'Белый'];
   const {clrs, inserts, nom, partners, users} = $p.cat;
@@ -95,7 +100,7 @@ async function cat(ctx, next, authorization) {
   };
 
   // подклеиваем контрагентов
-  for(let o of authorization.user._obj.acl_objs.filter((o) => o.type == 'cat.partners')){
+  for(let o of _auth.user._obj.acl_objs.filter((o) => o.type == 'cat.partners')){
     const p = await partners.get(o.acl_obj, 'promise');
     res.partners.push({
       ref: p.ref,
@@ -127,11 +132,6 @@ async function cat(ctx, next, authorization) {
   ctx.body = res;
 }
 
-async function nom(ctx, next) {
-
-  ctx.body = $p.cat.nom.alatable.filter((o) => !o.predefined_name || predefined_names.indexOf(o.predefined_name) != -1);
-}
-
 // формирует json описания продукций массива заказов
 async function array(ctx, next) {
 
@@ -141,22 +141,16 @@ async function array(ctx, next) {
 
 module.exports = async (ctx, next) => {
 
-  // проверяем ограничение по ip и авторизацию
-  const authorization = await auth(ctx, $p);
-  if(!authorization){
-    return;
-  }
-
   try{
     switch (ctx.params.class){
     case 'doc.calc_order':
-      return await calc_order(ctx, next, authorization);
+      return await calc_order(ctx, next);
     case 'cat':
-      return await cat(ctx, next, authorization);
+      return await cat(ctx, next);
     case 'store':
-      return await store(ctx, next, authorization);
+      return await store(ctx, next);
     case 'array':
-      return await array(ctx, next, authorization);
+      return await array(ctx, next);
     default:
       ctx.status = 404;
       ctx.body = {
