@@ -10,14 +10,12 @@ debug('required');
 // формирует json описания продукции заказа
 async function calc_order(ctx, next) {
 
+  const {_query, route} = ctx;
+  const res = {ref: route.params.ref, production: []};
+
   try {
-    const {_query, route} = ctx;
-    const res = {ref: route.params.ref, production: []};
-    const dp = $p.dp.buyers_order.create();
-
-
-
     const o = await $p.doc.calc_order.get(res.ref, 'promise');
+    const dp = $p.dp.buyers_order.create();
     dp.calc_order = o;
 
     let prod;

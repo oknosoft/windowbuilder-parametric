@@ -64,12 +64,18 @@ async function calc_order(ctx, next) {
 
 async function store(ctx, next) {
   // данные авторизации получаем из контекста
-  const {_auth} = ctx;
-
-  const _id = `_local/store${_auth.suffix}/${ctx.params.ref || 'mapping'}`;
+  const {_auth, params} = ctx;
+  const _id = `_local/store.${_auth.suffix}.${params.ref || 'mapping'}`;
   ctx.body = await $p.adapters.pouch.remote.doc.get(_id)
-    .catch((err) => null)
-    .then((doc) => doc || {error: true, message: `Объект ${_id} не найден`});
+    .catch((err) => ({error: true, message: `Объект ${_id} не найден\n${err.message}`}));
+}
+
+async function log(ctx, next) {
+  // данные авторизации получаем из контекста
+  const {_auth, params} = ctx;
+  const _id = `_local/log.${_auth.suffix}.${params.ref}`;
+  ctx.body = await $p.adapters.pouch.remote.doc.get(_id)
+    .catch((err) => ({error: true, message: `Объект ${_id} не найден\n${err.message}`}));
 }
 
 async function cat(ctx, next) {
@@ -149,6 +155,8 @@ module.exports = async (ctx, next) => {
       return await cat(ctx, next);
     case 'store':
       return await store(ctx, next);
+    case 'log':
+      return await log(ctx, next);
     case 'array':
       return await array(ctx, next);
     default:

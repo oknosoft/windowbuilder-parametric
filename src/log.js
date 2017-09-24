@@ -27,16 +27,18 @@ async function saveLog({_id, log, start, body}) {
   return doc.get(_id)
     .catch((err) => {
     if(err.status == 404) {
-      return {_id, events: []};
+      return {_id, rows: []};
     }
   })
     .then((rev) => {
     if(rev){
+      log.response = body || '';
       log.duration = Date.now() - parseInt(start.format('x'), 10);
-      if(body){
-        log.response = body;
+      if(rev.events){
+        rev.rows = rev.events;
+        delete rev.events;
       }
-      rev.events.push(log);
+      rev.rows.push(log);
       return doc.put(rev);
     }
   });
@@ -55,11 +57,11 @@ module.exports = async (ctx, next) => {
   // собираем объект лога
   const log = {
     start: start.format('HH:mm:ss'),
-    method: ctx.method,
-    headers: ctx.req.headers,
     url: ctx.originalUrl,
-    post_data: await getBody(ctx.req),
+    method: ctx.method,
     ip: ctx.ip,
+    headers: Object.keys(ctx.req.headers).map((key) => [key, ctx.req.headers[key]]),
+    post_data: await getBody(ctx.req),
   };
 
   if(ctx._auth) {
