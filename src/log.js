@@ -59,7 +59,7 @@ module.exports = async (ctx, next) => {
     start: start.format('HH:mm:ss'),
     url: ctx.originalUrl,
     method: ctx.method,
-    ip: ctx.ip,
+    ip: ctx.req.headers['x-real-ip'] || ctx.ip,
     headers: Object.keys(ctx.req.headers).map((key) => [key, ctx.req.headers[key]]),
     post_data: await getBody(ctx.req),
   };

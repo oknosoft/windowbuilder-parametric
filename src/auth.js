@@ -5,7 +5,7 @@ module.exports = async (ctx, $p) => {
 
   // если указано ограничение по ip - проверяем
   const {restrict_ips} = ctx.app;
-  if(restrict_ips.length && restrict_ips.indexOf(ctx.ip) == -1){
+  if(restrict_ips.length && restrict_ips.indexOf(ctx.req.headers['x-real-ip'] || ctx.ip) == -1){
     ctx.status = 403;
     ctx.body = 'ip restricted:' + ctx.ip;
     return;
