@@ -906,36 +906,42 @@ $p.cat.clrs.__define({
 	 * @param clr_sch {CatClrs} - цвет изделия
 	 * @return {*}
 	 */
-	by_predefined: {
-		value: function(clr, clr_elm, clr_sch){
-		  const {predefined_name} = clr;
-			if(predefined_name){
-			  switch (predefined_name){
-          case 'КакЭлемент':
-            return clr_elm;
-          case 'КакИзделие':
-            return clr_sch;
-          case 'КакЭлементСнаружи':
-            return clr_elm.clr_out.empty() ? clr_elm : clr_elm.clr_out;
-          case 'КакЭлементИзнутри':
-            return clr_elm.clr_in.empty() ? clr_elm : clr_elm.clr_in;
-          case 'КакИзделиеСнаружи':
-            return clr_sch.clr_out.empty() ? clr_sch : clr_sch.clr_out;
-          case 'КакИзделиеИзнутри':
-            return clr_sch.clr_in.empty() ? clr_sch : clr_sch.clr_in;
-          case 'КакЭлементИнверсный':
-            return this.inverted(clr_elm);
-          case 'КакИзделиеИнверсный':
-            return this.inverted(clr_sch);
-          case 'БезЦвета':
-            return this.get();
-          default :
-            return clr_elm;
+  by_predefined: {
+    value: function (clr, clr_elm, clr_sch, elm) {
+      const {predefined_name} = clr;
+      if(predefined_name) {
+        switch (predefined_name) {
+        case 'КакЭлемент':
+          return clr_elm;
+        case 'КакИзделие':
+          return clr_sch;
+        case 'КакЭлементСнаружи':
+          return clr_elm.clr_out.empty() ? clr_elm : clr_elm.clr_out;
+        case 'КакЭлементИзнутри':
+          return clr_elm.clr_in.empty() ? clr_elm : clr_elm.clr_in;
+        case 'КакИзделиеСнаружи':
+          return clr_sch.clr_out.empty() ? clr_sch : clr_sch.clr_out;
+        case 'КакИзделиеИзнутри':
+          return clr_sch.clr_in.empty() ? clr_sch : clr_sch.clr_in;
+        case 'КакЭлементИнверсный':
+          return this.inverted(clr_elm);
+        case 'КакИзделиеИнверсный':
+          return this.inverted(clr_sch);
+        case 'БезЦвета':
+          return this.get();
+        case 'КакВедущий':
+        case 'КакВедущийИзнутри':
+        case 'КакВедущийСнаружи':
+        case 'КакВедущийИнверсный':
+          return this.get();
+
+        default :
+          return clr_elm;
         }
-			}
-      return clr.empty() ? clr_elm : clr
-		}
-	},
+      }
+      return clr.empty() ? clr_elm : clr;
+    }
+  },
 
   /**
    * ### Инверсный цвет
@@ -4272,7 +4278,7 @@ $p.DocCalc_order = class DocCalc_order extends $p.DocCalc_order {
       return false;
     }
 
-    this.production.each((row) => {
+    this.production.forEach((row) => {
 
       doc_amount += row.amount;
       amount_internal += row.amount_internal;
@@ -4286,7 +4292,7 @@ $p.DocCalc_order = class DocCalc_order extends $p.DocCalc_order {
       //     sys_profile += name;
       //   }
       //
-      //   row.characteristic.constructions.each((row) => {
+      //   row.characteristic.constructions.forEach((row) => {
       //   	if(row.parent && !row.furn.empty()){
       //   		const name = row.furn.name_short || row.furn.name;
       //   		if(sys_furn.indexOf(name) == -1){
@@ -4342,6 +4348,25 @@ $p.DocCalc_order = class DocCalc_order extends $p.DocCalc_order {
       (partner.name ? ' ' + partner.name : '') +
       (note ? ' ' + note : '')).toLowerCase();
 
+    // пометим на удаление неиспользуемые характеристики
+    this._manager.pouch_db.query('svgs', {startkey: [this.ref, 0], endkey: [this.ref, 10e9]})
+      .then(({rows}) => {
+      const deleted = [];
+      for (const {id} of rows) {
+        const ref = id.substr(20);
+        if(this.production.find_rows({characteristic: ref}).length) {
+          continue;
+        }
+        deleted.push($p.cat.characteristics.get(ref, 'promise')
+          .then((ox) => !ox._deleted && ox.mark_deleted(true)));
+      }
+      return Promise.all(deleted);
+    })
+      .then((res) => {
+        res.length && this._manager.emit_async('svgs', this);
+      })
+      .catch((err) => null);
+
   }
 
   // при изменении реквизита
@@ -4367,6 +4392,10 @@ $p.DocCalc_order = class DocCalc_order extends $p.DocCalc_order {
   get doc_currency() {
     const currency = this.contract.settlements_currency;
     return currency.empty() ? $p.job_prm.pricing.main_currency : currency;
+  }
+
+  set doc_currency(v) {
+
   }
 
   get rounding() {
@@ -4775,6 +4804,7 @@ $p.DocCalc_order = class DocCalc_order extends $p.DocCalc_order {
     //nom,characteristic,note,quantity,unit,qty,len,width,s,first_cost,marginality,price,discount_percent,discount_percent_internal,
     //discount,amount,margin,price_internal,amount_internal,vat_rate,vat_amount,ordn,changed
 
+    row._data._loading = true;
     row.nom = ox.owner;
     row.note = _dp.note;
     row.quantity = _dp.quantity || 1;
@@ -4786,6 +4816,7 @@ $p.DocCalc_order = class DocCalc_order extends $p.DocCalc_order {
     if(row.unit.owner != row.nom) {
       row.unit = row.nom.storage_unit;
     }
+    row._data._loading = false;
   }
 
   /**
@@ -5006,6 +5037,9 @@ $p.DocCalc_orderProductionRow = class DocCalc_orderProductionRow extends $p.DocC
 
       _obj[field] = field == 'quantity' ? parseFloat(value) : '' + value;
 
+      nom = this.nom;
+      characteristic = this.characteristic;
+
       // проверим владельца характеристики
       if(!characteristic.empty()) {
         if(!characteristic.calc_order.empty() && characteristic.owner != nom) {
@@ -5013,11 +5047,9 @@ $p.DocCalc_orderProductionRow = class DocCalc_orderProductionRow extends $p.DocC
         }
         else if(characteristic.owner != nom) {
           _obj.characteristic = $p.utils.blank.guid;
+          characteristic = this.characteristic;
         }
       }
-
-      nom = this.nom;
-      characteristic = this.characteristic;
 
       // проверим единицу измерения
       if(unit.owner != nom) {
@@ -5033,7 +5065,7 @@ $p.DocCalc_orderProductionRow = class DocCalc_orderProductionRow extends $p.DocC
       $p.pricing.price_type(fake_prm);
       $p.pricing.calc_first_cost(fake_prm);
       $p.pricing.calc_amount(fake_prm);
-      if(price && !_obj.price){
+      if(price && !_obj.price) {
         _obj.price = price;
         recalc = true;
       }
@@ -5041,7 +5073,7 @@ $p.DocCalc_orderProductionRow = class DocCalc_orderProductionRow extends $p.DocC
 
     if('price_internal,quantity,discount_percent_internal'.indexOf(field) != -1 || recalc) {
 
-      if(!recalc){
+      if(!recalc) {
         _obj[field] = parseFloat(value);
       }
 
@@ -5303,19 +5335,17 @@ $p.doc.calc_order.form_list = function(pwnd, attr, handlers){
      * @param source
      */
     if(!_meta_patched) {
-      (function (source) {
+      (function (source, user) {
         // TODO: штуки сейчас спрятаны в ro и имеют нулевую ширину
         if($p.wsql.get_user_param('hide_price_dealer')) {
           source.headers = '№,Номенклатура,Характеристика,Комментарий,Штук,Длина,Высота,Площадь,Колич.,Ед,Скидка,Цена,Сумма,Скидка&nbsp;дил,Цена&nbsp;дил,Сумма&nbsp;дил';
           source.widths = '40,200,*,220,0,70,70,70,70,40,70,70,70,0,0,0';
           source.min_widths = '30,200,220,150,0,70,40,70,70,70,70,70,70,0,0,0';
-
         }
         else if($p.wsql.get_user_param('hide_price_manufacturer')) {
           source.headers = '№,Номенклатура,Характеристика,Комментарий,Штук,Длина,Высота,Площадь,Колич.,Ед,Скидка&nbsp;пост,Цена&nbsp;пост,Сумма&nbsp;пост,Скидка,Цена,Сумма';
           source.widths = '40,200,*,220,0,70,70,70,70,40,0,0,0,70,70,70';
           source.min_widths = '30,200,220,150,0,70,40,70,70,70,0,0,0,70,70,70';
-
         }
         else {
           source.headers = '№,Номенклатура,Характеристика,Комментарий,Штук,Длина,Высота,Площадь,Колич.,Ед,Скидка&nbsp;пост,Цена&nbsp;пост,Сумма&nbsp;пост,Скидка&nbsp;дил,Цена&nbsp;дил,Сумма&nbsp;дил';
@@ -5323,18 +5353,19 @@ $p.doc.calc_order.form_list = function(pwnd, attr, handlers){
           source.min_widths = '30,200,220,150,0,70,40,70,70,70,70,70,70,70,70,70';
         }
 
-        if($p.current_user.role_available('СогласованиеРасчетовЗаказов')) {
+        if(user.role_available('СогласованиеРасчетовЗаказов') || user.role_available('РедактированиеЦен')) {
           source.types = 'cntr,ref,ref,txt,ro,calck,calck,calck,calck,ref,calck,calck,ro,calck,calck,ro';
         }
-        else if($p.current_user.role_available('РедактированиеСкидок')) {
+        else if(user.role_available('РедактированиеСкидок')) {
           source.types = 'cntr,ref,ref,txt,ro,calck,calck,calck,calck,ref,calck,ro,ro,calck,calck,ro';
         }
         else {
           source.types = 'cntr,ref,ref,txt,ro,calck,calck,calck,calck,ref,ro,ro,ro,calck,calck,ro';
         }
 
-      })($p.doc.calc_order.metadata().form.obj.tabular_sections.production);
-      _meta_patched = true;
+        _meta_patched = true;
+
+      })($p.doc.calc_order.metadata().form.obj.tabular_sections.production, $p.current_user);
     }
 
     attr.draw_tabular_sections = (o, wnd, tabular_init) => {
@@ -5387,8 +5418,6 @@ $p.doc.calc_order.form_list = function(pwnd, attr, handlers){
        */
       wnd.elmnts.statusbar = wnd.attachStatusBar();
       wnd.elmnts.svgs = new $p.iface.OSvgs(wnd, wnd.elmnts.statusbar, rsvg_click);
-      wnd.elmnts.svgs.reload(o);
-
     };
 
     attr.draw_pg_header = (o, wnd) => {
@@ -5487,13 +5516,17 @@ $p.doc.calc_order.form_list = function(pwnd, attr, handlers){
           wnd.prompt = prompt;
           wnd.close_confirmed = true;
 
+          rsvg_reload();
+          o._manager.on('svgs', rsvg_reload);
+
           const search = $p.job_prm.parse_url_str(location.search);
           if(search.ref){
             setTimeout(() => {
               wnd.elmnts.tabs.tab_production && wnd.elmnts.tabs.tab_production.setActive();
               rsvg_click(search.ref, 0);
             }, 200);
-          }
+          };
+
           return res;
         }
       });
@@ -5518,8 +5551,8 @@ $p.doc.calc_order.form_list = function(pwnd, attr, handlers){
       else {
         handlers.handleNavigate(`/`);
       }
+      $p.doc.calc_order.off('svgs', rsvg_reload);
     }
-
 
     /**
      * обработчик нажатия кнопок командных панелей
@@ -5907,6 +5940,10 @@ $p.doc.calc_order.form_list = function(pwnd, attr, handlers){
         const row = o.production.get(selId);
         row && !row.characteristic.empty() && row.characteristic.form_obj().then((w) => w.wnd.maximize());
       }
+    }
+
+    function rsvg_reload() {
+      o && wnd && wnd.elmnts && wnd.elmnts.svgs && wnd.elmnts.svgs.reload(o);
     }
 
     function rsvg_click(ref, dbl) {
@@ -7707,7 +7744,7 @@ class ProductsBuilding {
     if(!row_spec.characteristic.empty() && row_spec.characteristic.owner != row_spec.nom){
       row_spec.characteristic = $p.utils.blank.guid;
     }
-    row_spec.clr = $p.cat.clrs.by_predefined(row_base ? row_base.clr : elm.clr, elm.clr, ox.clr);
+    row_spec.clr = $p.cat.clrs.by_predefined(row_base ? row_base.clr : elm.clr, elm.clr, ox.clr, elm);
     row_spec.elm = elm.elm;
     if(origin){
       row_spec.origin = origin;

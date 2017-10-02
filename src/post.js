@@ -12,6 +12,7 @@ async function calc_order(ctx, next) {
 
   const {_query, route} = ctx;
   const res = {ref: route.params.ref, production: []};
+  const {contracts, nom, inserts, clrs} = $p.cat;
 
   try {
     const o = await $p.doc.calc_order.get(res.ref, 'promise');
@@ -39,12 +40,12 @@ async function calc_order(ctx, next) {
       o.partner = _query.partner;
     }
     if(o.contract.empty() || _query.partner) {
-      o.contract = $p.cat.contracts.by_partner_and_org(o.partner, o.organization);
+      o.contract = contracts.by_partner_and_org(o.partner, o.organization);
     }
     o.vat_consider = o.vat_included = true;
     for (let row of _query.production) {
-      if(!$p.cat.nom.by_ref[row.nom]) {
-        if(!$p.cat.inserts.by_ref[row.nom]) {
+      if(!nom.by_ref[row.nom] || nom.by_ref[row.nom].is_new()) {
+        if(!inserts.by_ref[row.nom] || inserts.by_ref[row.nom].is_new()) {
           ctx.status = 404;
           ctx.body = `Не найдена номенклатура или вставка ${row.nom}`;
           return o.unload();
@@ -52,7 +53,7 @@ async function calc_order(ctx, next) {
         row.inset = row.nom;
         delete row.nom;
       }
-      if(row.clr && row.clr != $p.utils.blank.guid && !$p.cat.clrs.by_ref[row.clr]) {
+      if(row.clr && row.clr != $p.utils.blank.guid && !clrs.by_ref[row.clr]) {
         ctx.status = 404;
         ctx.body = `Не найден цвет ${row.clr}`;
         return o.unload();

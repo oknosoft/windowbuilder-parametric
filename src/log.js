@@ -61,22 +61,27 @@ module.exports = async (ctx, next) => {
     method: ctx.method,
     ip: ctx.req.headers['x-real-ip'] || ctx.ip,
     headers: Object.keys(ctx.req.headers).map((key) => [key, ctx.req.headers[key]]),
-    post_data: await getBody(ctx.req),
   };
 
   if(ctx._auth) {
     try {
+      // тело запроса анализируем только для авторизованных пользователей
+      log.post_data = await getBody(ctx.req);
       ctx._query = log.post_data.length > 0 ? JSON.parse(log.post_data) : {};
+      // передаём управление основной задаче
       await next();
+      // по завершению, записываем лог
       saveLog({_id, log, start, body: log.url.indexOf('prm/doc.calc_order') != -1 && ctx.body});
-    } catch (err) {
-      // log uncaught downstream errors
+    }
+    catch (err) {
+      // в случае ошибки, так же, записываем лог
       log.error = err.message;
       saveLog({_id, log, start});
       throw err;
     }
   }
   else{
+    // для неавторизованных пользователей записываем лог
     log.error = 'unauthorized';
     saveLog({_id, log, start, body: ctx.body});
   }
