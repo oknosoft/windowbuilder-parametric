@@ -29,6 +29,11 @@ async function calc_order(ctx, next) {
         ctx.body = `Запрещено изменять проведенный заказ ${res.ref}`;
         return o.unload();
       }
+      if(o.obj_delivery_state == 'Отправлен' && _query.obj_delivery_state != 'Отозван') {
+        ctx.status = 403;
+        ctx.body = `Запрещено изменять отправленный заказ ${res.ref} - его сначала нужно отозвать`;
+        return o.unload();
+      }
       prod = await o.load_production();
       o.production.clear();
     }
