@@ -40,7 +40,7 @@ async function calc_order(ctx, next) {
     o._data._loading = true;
     o.date = $p.utils.moment(_query.date).toDate();
     o.number_internal = _query.number_doc;
-    o.obj_delivery_state = _query.obj_delivery_state == 'Отозван' ? 'Отозван' : (_query.obj_delivery_state == 'Черновик' ? 'Черновик' : 'Отправлен');
+    o.obj_delivery_state = 'Черновик';
     if(_query.partner) {
       o.partner = _query.partner;
     }
@@ -68,6 +68,7 @@ async function calc_order(ctx, next) {
 
     const ax = await o.process_add_product_list(dp);
     await Promise.all(ax);
+    o.obj_delivery_state = _query.obj_delivery_state == 'Отозван' ? 'Отозван' : (_query.obj_delivery_state == 'Черновик' ? 'Черновик' : 'Отправлен');
     await o.save();
     serialize_prod({o, prod, ctx});
     o.unload();

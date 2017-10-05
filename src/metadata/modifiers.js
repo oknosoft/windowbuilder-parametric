@@ -4775,7 +4775,7 @@ $p.DocCalc_order = class DocCalc_order extends $p.DocCalc_order {
         prod.push(characteristic.ref);
       }
     });
-    return (mgr.adapter.load_array(mgr, prod))
+    return mgr.adapter.load_array(mgr, prod)
       .then(() => {
         prod.length = 0;
         this.production.forEach((row) => {
@@ -4899,7 +4899,7 @@ $p.DocCalc_order = class DocCalc_order extends $p.DocCalc_order {
         ox.name = ox.prod_name();
 
         // записываем расчет, если не сделали этого ранее, чтобы не погибла ссылка на расчет в характеристике
-        return this.is_new() ? this.save().then(() => row) : row;
+        return this.is_new() && !$p.wsql.alasql.utils.isNode ? this.save().then(() => row) : row;
       });
 
   }
