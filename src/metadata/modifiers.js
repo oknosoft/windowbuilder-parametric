@@ -4160,6 +4160,8 @@ class CalcOrderFormProductList {
 // переопределяем формирование списка выбора
 $p.doc.calc_order.metadata().tabular_sections.production.fields.characteristic._option_list_local = true;
 
+// переопределяем объекты назначения дополнительных реквизитов
+$p.doc.calc_order._destinations_condition = {predefined_name: {in: ['Документ_Расчет', 'Документ_ЗаказПокупателя']}};
 
 // метод загрузки шаблонов
 $p.doc.calc_order.load_templates = async function () {
