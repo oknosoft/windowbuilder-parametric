@@ -15,7 +15,7 @@
     "meta:link": "npm link metadata-core metadata-redux metadata-pouchdb metadata-abstract-ui metadata-react"
   },
   "dependencies": {
-    "alasql": "^0.4.2",
+    "alasql": "^0.4.3",
     "koa": "^2.3.0",
     "koa-better-router": "^2.1",
     "metadata-abstract-ui": "^2.0.2-beta.30",
