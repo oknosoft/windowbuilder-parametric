@@ -10,6 +10,7 @@ const fs = require('fs');
 const path = require('path');
 
 process.env.DEBUG = 'prebuild:,-not_this';
+process.env.COUCHLOCAL = 'http://cou221:5984/wb_';
 const debug = require('debug')('prebuild:');
 
 debug('Читаем конструктор и плагины');

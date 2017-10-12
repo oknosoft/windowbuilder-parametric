@@ -33,7 +33,7 @@ function serialize_prod({o, prod, ctx}) {
     }
   }
   ctx.body = JSON.stringify(o);
-  prod.forEach((cx) => {
+  prod && prod.forEach((cx) => {
     if (!cx.empty() && !cx.is_new() && !cx.calc_order.empty()) {
       cx.unload();
     }

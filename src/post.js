@@ -12,9 +12,17 @@ async function calc_order(ctx, next) {
 
   const {_query, route} = ctx;
   const res = {ref: route.params.ref, production: []};
+  const {cat, doc, utils, job_prm} = $p;
+  const {contracts, nom, inserts, clrs} = cat;
 
   try {
-    const o = await $p.doc.calc_order.get(res.ref, 'promise');
+    if(!utils.is_guid(res.ref)){
+      ctx.status = 404;
+      ctx.body = `Параметр запроса ref=${res.ref} не соответствует маске уникального идентификатора`;
+      return;
+    }
+
+    const o = await doc.calc_order.get(res.ref, 'promise');
     const dp = $p.dp.buyers_order.create();
     dp.calc_order = o;
 
@@ -28,23 +36,51 @@ async function calc_order(ctx, next) {
         ctx.body = `Запрещено изменять проведенный заказ ${res.ref}`;
         return o.unload();
       }
+      if(o.obj_delivery_state == 'Отправлен' && _query.obj_delivery_state != 'Отозван') {
+        ctx.status = 403;
+        ctx.body = `Запрещено изменять отправленный заказ ${res.ref} - его сначала нужно отозвать`;
+        return o.unload();
+      }
       prod = await o.load_production();
       o.production.clear();
     }
+
+    // включаем режим загрузки, чтобы в пустую не выполнять обработчики при изменении реквизитов
     o._data._loading = true;
-    o.date = $p.utils.moment(_query.date).toDate();
+
+    // заполняем шапку заказа
+    o.date = utils.moment(_query.date).toDate();
     o.number_internal = _query.number_doc;
-    o.obj_delivery_state = _query.obj_delivery_state == 'Отозван' ? 'Отозван' : (_query.obj_delivery_state == 'Черновик' ? 'Черновик' : 'Отправлен');
+    o.obj_delivery_state = 'Черновик';
     if(_query.partner) {
       o.partner = _query.partner;
     }
     if(o.contract.empty() || _query.partner) {
-      o.contract = $p.cat.contracts.by_partner_and_org(o.partner, o.organization);
+      o.contract = contracts.by_partner_and_org(o.partner, o.organization);
     }
     o.vat_consider = o.vat_included = true;
+
+    // допреквизиты: бежим структуре входного параметра, если свойства нет в реквизитах, проверяем доп
+    for(const fld in _query) {
+      if(!o._metadata(fld) && job_prm.properties[fld]){
+        let finded;
+        const property = job_prm.properties[fld];
+        //const value = property.type.date_part && property.type.types.length == 1 ? new Date(_query[fld]) : _query[fld];
+        o.extra_fields.find_rows({property}, (row) => {
+          row.value = _query[fld];
+          finded = true;
+          return false;
+        });
+        if(!finded){
+          o.extra_fields.add({property, value: _query[fld]});
+        }
+      }
+    }
+
+    // подготавливаем массив продукций
     for (let row of _query.production) {
-      if(!$p.cat.nom.by_ref[row.nom]) {
-        if(!$p.cat.inserts.by_ref[row.nom]) {
+      if(!nom.by_ref[row.nom] || nom.by_ref[row.nom].is_new()) {
+        if(!inserts.by_ref[row.nom] || inserts.by_ref[row.nom].is_new()) {
           ctx.status = 404;
           ctx.body = `Не найдена номенклатура или вставка ${row.nom}`;
           return o.unload();
@@ -52,7 +88,7 @@ async function calc_order(ctx, next) {
         row.inset = row.nom;
         delete row.nom;
       }
-      if(row.clr && row.clr != $p.utils.blank.guid && !$p.cat.clrs.by_ref[row.clr]) {
+      if(row.clr && row.clr != utils.blank.guid && !clrs.by_ref[row.clr]) {
         ctx.status = 404;
         ctx.body = `Не найден цвет ${row.clr}`;
         return o.unload();
@@ -60,9 +96,15 @@ async function calc_order(ctx, next) {
       const prow = dp.production.add(row);
     }
 
+    // добавляем строки продукций и материалов
     const ax = await o.process_add_product_list(dp);
     await Promise.all(ax);
+    o.obj_delivery_state = _query.obj_delivery_state == 'Отозван' ? 'Отозван' : (_query.obj_delivery_state == 'Черновик' ? 'Черновик' : 'Отправлен');
+
+    // записываем
     await o.save();
+
+    // формируем ответ
     serialize_prod({o, prod, ctx});
     o.unload();
   }
