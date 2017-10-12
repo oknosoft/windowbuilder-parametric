@@ -21,7 +21,7 @@
     "metadata-abstract-ui": "^2.0.2-beta.31",
     "metadata-core": "^2.0.2-beta.31",
     "metadata-pouchdb": "^2.0.2-beta.31",
-    "moment": "^2.18",
+    "moment": "^2.19.1",
     "pouchdb": "^6.3.4",
     "pouchdb-adapter-http": "^6.3.4",
     "pouchdb-adapter-idb": "^6.3.4",
