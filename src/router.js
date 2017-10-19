@@ -3,12 +3,11 @@
 const debug = require('debug')('wb:router');
 debug('start');
 
-
 const Router = require('koa-better-router');
-const rep = Router({ prefix: '/prm' });
+const router = Router({ prefix: '/prm' });
 
-rep.loadMethods()
+router.loadMethods()
   .get('/:class/:ref', require('./get'))
   .post('/:class/:ref', require('./post'));
 
-module.exports = rep;
+module.exports = router;
