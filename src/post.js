@@ -51,6 +51,9 @@ async function calc_order(ctx, next) {
     // заполняем шапку заказа
     o.date = utils.moment(_query.date).toDate();
     o.number_internal = _query.number_doc;
+    if(_query.note){
+      o.note = _query.note;
+    }
     o.obj_delivery_state = 'Черновик';
     if(_query.partner) {
       o.partner = _query.partner;
