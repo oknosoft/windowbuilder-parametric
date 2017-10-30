@@ -322,7 +322,22 @@ module.exports = function($p) {
  */
 
 // при старте приложения, загружаем в ОЗУ обычные характеристики (без ссылок на заказы)
-$p.md.once('predefined_elmnts_inited', () => $p.cat.characteristics.pouch_load_view('doc/nom_characteristics'));
+$p.md.once('predefined_elmnts_inited', () => {
+  $p.cat.characteristics.pouch_load_view('doc/nom_characteristics')
+    // и корректируем метаданные формы спецификации с учетом ролей пользователя
+    .then(() => {
+    const {current_user} = $p;
+      if(current_user && (
+          current_user.role_available('СогласованиеРасчетовЗаказов') ||
+          current_user.role_available('ИзменениеТехнологическойНСИ') ||
+          current_user.role_available('РедактированиеСкидок') ||
+          current_user.role_available('РедактированиеЦен')
+        )) {
+        return;
+      };
+      $p.cat.characteristics.metadata().form.obj.tabular_sections.specification.widths = "50,*,70,*,50,70,70,80,70,70,70,0,0,0";
+    })
+});
 
 // свойства объекта характеристики
 $p.CatCharacteristics = class CatCharacteristics extends $p.CatCharacteristics {
@@ -595,7 +610,7 @@ $p.CatCharacteristicsInsertsRow.prototype.value_change = function (field, type, 
     if(value != this.inset){
       const {_owner} = this._owner;
       // удаляем параметры старой вставки
-      _owner.params.clear({inset: this.inset, cnstr: this.cnstr});
+      !this.inset.empty() && _owner.params.clear({inset: this.inset, cnstr: this.cnstr});
       // устанавливаем значение новой вставки
       this._obj.inset = value;
       // заполняем параметры по умолчанию
@@ -1564,7 +1579,7 @@ Object.defineProperties($p.cat.divisions, {
       $p.current_user.acl_objs.find_rows({type: "cat.divisions"}, (row) => {
         if(list.indexOf(row.acl_obj) == -1){
           list.push(row.acl_obj);
-          row.acl_obj._children.forEach((o) => {
+          row.acl_obj._children().forEach((o) => {
             if(list.indexOf(o) == -1){
               list.push(o);
             }
@@ -1702,20 +1717,23 @@ $p.adapters.pouch.once('pouch_data_loaded', () => {
   const {formulas} = $p.cat;
   formulas.pouch_find_rows({ _top: 500, _skip: 0 })
     .then((rows) => {
-      rows.forEach((formula) => {
+    const parents = [formulas.predefined("printing_plates"), formulas.predefined("modifiers")];
+    const filtered = rows.filter(v => !v.disabled && parents.indexOf(v.parent) !== -1);
+    filtered.sort((a, b) => a.sorting_field - b.sorting_field).forEach((formula) => {
         // формируем списки печатных форм и внешних обработок
-        if(formula.parent == formulas.predefined("printing_plates")){
+        if(formula.parent == parents[0]){
           formula.params.find_rows({param: "destination"}, (dest) => {
             const dmgr = $p.md.mgr_by_class_name(dest.value);
             if(dmgr){
               if(!dmgr._printing_plates){
                 dmgr._printing_plates = {};
               }
-              dmgr._printing_plates["prn_" + formula.ref] = formula;
+              dmgr._printing_plates[`prn_${formula.ref}`] = formula;
             }
           })
         }
-        else if(formula.parent == formulas.predefined("modifiers")){
+        else {
+          // выполняем модификаторы
           formula.execute();
         }
       });
@@ -1730,12 +1748,18 @@ $p.CatFormulas.prototype.__define({
 
 			// создаём функцию из текста формулы
 			if(!this._data._formula && this.formula){
-			  if(this.async){
-          const AsyncFunction = Object.getPrototypeOf(async function(){}).constructor;
-          this._data._formula = (new AsyncFunction("obj,$p", this.formula)).bind(this);
+			  try{
+          if(this.async){
+            const AsyncFunction = Object.getPrototypeOf(async function(){}).constructor;
+            this._data._formula = (new AsyncFunction("obj,$p", this.formula)).bind(this);
+          }
+          else{
+            this._data._formula = (new Function("obj,$p", this.formula)).bind(this);
+          }
         }
-        else{
-          this._data._formula = (new Function("obj,$p", this.formula)).bind(this);
+        catch(err){
+          this._data._formula = () => false;
+          $p.record_log(err);
         }
       }
 
@@ -2086,7 +2110,7 @@ $p.CatFurns = class CatFurns extends $p.CatFurns {
         if(row_furn.quantity){
           const row_spec = res.add(row_furn);
           row_spec.origin = this;
-          if(!row_furn.formula.empty()){
+          if(!row_furn.formula.empty() && !row_furn.formula.condition_formula){
             row_furn.formula.execute({ox, contour, row_furn, row_spec});
           }
         }
@@ -2109,10 +2133,16 @@ $p.CatFurnsSpecificationRow = class CatFurnsSpecificationRow extends $p.CatFurns
    * @param cache {Object}
    */
   check_restrictions(contour, cache) {
-    const {elm, dop, handle_height_min, handle_height_max} = this;
+    const {elm, dop, handle_height_min, handle_height_max, formula} = this;
     const {direction, h_ruch, cnstr} = contour;
 
+    // проверка по высоте ручки
     if(h_ruch < handle_height_min || (handle_height_max && h_ruch > handle_height_max)){
+      return false;
+    }
+
+    // проверка по формуле
+    if(!cache.ignore_formulas && !formula.empty() && formula.condition_formula && !formula.execute({ox: cache.ox, contour, row_furn: this})) {
       return false;
     }
 
@@ -2665,6 +2695,9 @@ $p.CatInserts = class CatInserts extends $p.CatInserts {
           });
           if(row_ins_spec.count_calc_method == ПоФормуле){
             row_spec.qty = qty;
+          }
+          else if(row_ins_spec.formula.condition_formula && !qty){
+            row_spec.qty = 0;
           }
         }
         calc_count_area_mass(row_spec, spec, _row, row_ins_spec.angle_calc_method);
@@ -4960,7 +4993,7 @@ $p.DocCalc_order = class DocCalc_order extends $p.DocCalc_order {
 
           if(params) {
             params.find_rows({elm: row_spec.row}, (prow) => {
-              ox.params.add(prow, true);
+              ox.params.add(prow, true).inset = row_spec.inset;
             });
           }
         }
@@ -5676,7 +5709,6 @@ $p.doc.calc_order.form_list = function(pwnd, attr, handlers){
       case 'btn_clone':
         open_builder('clone');
         break;
-
 
       case 'btn_add_product':
         new CalcOrderFormProductList(wnd, o);
@@ -7179,7 +7211,7 @@ class ProductsBuilding {
 
           // если указана формула - выполняем
           if(!row_cnn_spec.formula.empty()) {
-            row_cnn_spec.formula.execute({
+            const qty = row_cnn_spec.formula.execute({
               ox,
               elm,
               len_angl,
@@ -7188,8 +7220,11 @@ class ProductsBuilding {
               row_cnn: row_cnn_spec,
               row_spec: row_spec
             });
+            // если формула является формулой условия, используем результат, как фильтр
+            if(row_cnn_spec.formula.condition_formula && !qty){
+              row_spec.qty = 0;
+            }
           }
-
           calc_count_area_mass(row_spec, spec, len_angl, row_cnn_spec.angle_calc_method);
         }
 
