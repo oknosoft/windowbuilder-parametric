@@ -72,7 +72,7 @@ require('./meta_pouchdb')($p.classes.DataManager.prototype);
         // формируем новый
         pouch.load_changes({docs: [change.doc]});
       }).on('error', (err) => {
-        // handle errors
+        debug(`change error ${err}`);
       });
       debug(`loadind to ram: READY`);
     },

@@ -1,49 +1,36 @@
 {
   "name": "windowbuilder-parametric",
   "description": "Parametric orders for windowbuilder project",
-  "version": "0.1.0",
+  "version": "2.0.236",
   "author": "Evgeniy Malyarov <info@oknosoft.ru> (http://www.oknosoft.ru)",
   "license": "SEE LICENSE IN LICENSE.en.md",
   "main": "index.js",
   "engines": {
-    "node": "^7.10",
-    "npm": "^5.4"
+    "node": "^8.8",
+    "npm": "^5.5"
   },
   "scripts": {
     "start": "node ./index",
-    "meta:prebuild": "node ./scripts/prebuild.meta",
-    "meta:link": "npm link metadata-core metadata-redux metadata-pouchdb metadata-abstract-ui metadata-react"
+    "meta:prebuild": "node scripts/meta.prebuild",
+    "meta:link": "node scripts/meta.link.js"
   },
   "dependencies": {
-    "alasql": "^0.4.3",
-    "koa": "^2.3.0",
+    "koa": "^2.4.1",
     "koa-better-router": "^2.1",
-    "metadata-abstract-ui": "^2.0.4-beta.33",
-    "metadata-core": "^2.0.4-beta.33",
-    "metadata-pouchdb": "^2.0.4-beta.33",
-    "moment": "^2.19.1",
-    "pouchdb": "^6.3.4",
-    "pouchdb-adapter-http": "^6.3.4",
-    "pouchdb-adapter-idb": "^6.3.4",
-    "pouchdb-adapter-memory": "^6.3.4",
-    "pouchdb-adapter-websql": "^6.3.4",
-    "pouchdb-authentication": "^0.5",
-    "pouchdb-core": "^6.3.4",
-    "pouchdb-find": "^6.3.4",
-    "pouchdb-mapreduce": "^6.3.4",
-    "pouchdb-replication": "^6.3.4"
+    "md5-file": "^3.2.3",
+    "metadata-abstract-ui": "^2.0.16-beta.43",
+    "metadata-core": "^2.0.16-beta.43",
+    "metadata-pouchdb": "^2.0.16-beta.43"
   },
   "devDependencies": {
-    "clipboard": "^1.7",
-    "debug": "^3.1.0",
-    "eslint": "^4.10.0",
+    "eslint": "^4.14.0",
     "eslint-config-standard": "^10.2",
     "eslint-config-standard-react": "^5.0",
     "eslint-plugin-babel": "^4.1.2",
     "eslint-plugin-import": "^2.8.0",
     "eslint-plugin-node": "^5.2.1",
     "eslint-plugin-promise": "^3.6.0",
-    "eslint-plugin-react": "^7.4.0",
+    "eslint-plugin-react": "^7.5.1",
     "eslint-plugin-standard": "^3.0",
     "gulp": "^3.9",
     "gulp-concat": "^2.6",
