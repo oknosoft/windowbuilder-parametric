@@ -46,10 +46,6 @@ $p.wsql.init((prm) => {
   // по умолчанию, обращаемся к зоне 0
   prm.zone = config.zone;
 
-  // расположение 1C
-  if (config.rest_path)
-    prm.rest_path = config.rest_path;
-
   // расположение couchdb
   prm.couch_path = config.couch_local;
 
@@ -61,7 +57,7 @@ $p.wsql.init((prm) => {
 
   let _m;
 
-  debug('Читаем описание метаданных из CouchDB');
+  debug(`Читаем описание метаданных из CouchDB ${config.couch_local}`);
   return db.info()
     .then((info) => {
     debug(`Подключение к ${info.host}`);
