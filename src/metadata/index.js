@@ -18,6 +18,12 @@ require('./dhtmlx_eve')($p);
 // обеспечиваем совместимость DataManager с v0.12
 require('./meta_pouchdb')($p.classes.DataManager.prototype);
 
+// модификаторы data-объектов в старом формате
+const modifiers = require('./modifiers')
+
+// модификаторы data-объектов в новом формате
+import modifiers_new from './chartscharacteristics';
+
 
 // инициализируем параметры сеанса и метаданные
 (async () => {
@@ -27,12 +33,6 @@ require('./meta_pouchdb')($p.classes.DataManager.prototype);
 
   // функция инициализации структуры метаданных
   const meta_init = require('./init');
-
-  // модификаторы data-объектов в старом формате
-  const modifiers = require('./modifiers');
-
-  // модификаторы data-объектов в новом формате
-  const modifiers_new = require('./chartscharacteristics');
 
   // реквизиты подключения к couchdb
   const {user_node} = config_init();
