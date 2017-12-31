@@ -28,8 +28,11 @@ require('./meta_pouchdb')($p.classes.DataManager.prototype);
   // функция инициализации структуры метаданных
   const meta_init = require('./init');
 
-  // модификаторы data-объектов
+  // модификаторы data-объектов в старом формате
   const modifiers = require('./modifiers');
+
+  // модификаторы data-объектов в новом формате
+  const modifiers_new = require('./chartscharacteristics');
 
   // реквизиты подключения к couchdb
   const {user_node} = config_init();
@@ -39,6 +42,7 @@ require('./meta_pouchdb')($p.classes.DataManager.prototype);
 
   // подключим модификаторы
   modifiers($p);
+  modifiers_new($p);
   debug('inited & modified');
 
   // загружаем кешируемые справочники в ram и начинаем следить за изменениями ram

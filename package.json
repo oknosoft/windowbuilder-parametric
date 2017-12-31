@@ -18,9 +18,9 @@
     "koa": "^2.4.1",
     "koa-better-router": "^2.1",
     "md5-file": "^3.2.3",
-    "metadata-abstract-ui": "^2.0.16-beta.43",
-    "metadata-core": "^2.0.16-beta.43",
-    "metadata-pouchdb": "^2.0.16-beta.43"
+    "metadata-abstract-ui": "^2.0.16-beta.44",
+    "metadata-core": "^2.0.16-beta.44",
+    "metadata-pouchdb": "^2.0.16-beta.44"
   },
   "devDependencies": {
     "eslint": "^4.14.0",
