@@ -15,9 +15,6 @@ debug('created');
 // эмулируем излучатель событий dhtmlx
 require('./dhtmlx_eve')($p);
 
-// обеспечиваем совместимость DataManager с v0.12
-require('./meta_pouchdb')($p.classes.DataManager.prototype);
-
 // модификаторы data-объектов в старом формате
 const modifiers = require('./modifiers')
 

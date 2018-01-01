@@ -99,11 +99,8 @@ debug('created');
 // эмулируем излучатель событий dhtmlx
 __webpack_require__(13)($p);
 
-// обеспечиваем совместимость DataManager с v0.12
-__webpack_require__(14)($p.classes.DataManager.prototype);
-
 // модификаторы data-объектов в старом формате
-const modifiers = __webpack_require__(15);
+const modifiers = __webpack_require__(14);
 
 // модификаторы data-объектов в новом формате
 
@@ -112,10 +109,10 @@ const modifiers = __webpack_require__(15);
 (async () => {
 
   // функция установки параметров сеанса
-  const config_init = __webpack_require__(16);
+  const config_init = __webpack_require__(15);
 
   // функция инициализации структуры метаданных
-  const meta_init = __webpack_require__(18);
+  const meta_init = __webpack_require__(17);
 
   // реквизиты подключения к couchdb
   const { user_node } = config_init();
@@ -365,7 +362,7 @@ const app = new Koa();
 app.use(__webpack_require__(6));
 
 // Register the router as Koa middleware
-app.use(__webpack_require__(21).middleware());
+app.use(__webpack_require__(20).middleware());
 
 app.listen(process.env.PORT || 3000);
 app.restrict_ips = process.env.IPS ? process.env.IPS.split(',') : [];
@@ -394,7 +391,7 @@ module.exports = require("koa");
  */
 
 const $p = __webpack_require__(1);
-const auth = __webpack_require__(19);
+const auth = __webpack_require__(18);
 
 function getBody(req) {
   return new Promise((resolve, reject) => {
@@ -1128,47 +1125,6 @@ module.exports = function ($p) {
 
 /***/ }),
 /* 14 */
-/***/ (function(module, exports, __webpack_require__) {
-
-"use strict";
-
-
-/**
- * Обеспечивает совместимость DataManager с v0.12
- */
-
-module.exports = function (proto) {
-  Object.defineProperties(proto, {
-
-    // pouch_db: {
-    //   get: function() {
-    //     return this.adapter.db(this);
-    //   }
-    // },
-    //
-    // pouch_load_view: {
-    //   value: function (view) {
-    //     return this.adapter.load_view(this, view);
-    //   }
-    // },
-    //
-    // pouch_find_rows: {
-    //   get: function () {
-    //     return this.find_rows_remote
-    //   }
-    // },
-
-    handle_event: {
-      value: function (obj, name, attr) {
-        this.emit(name, obj, attr);
-      }
-    }
-
-  });
-};
-
-/***/ }),
-/* 15 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -7994,14 +7950,14 @@ module.exports = function ($p) {
 };
 
 /***/ }),
-/* 16 */
+/* 15 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
 
 
 // конфигурация подключения к CouchDB
-const config = __webpack_require__(17);
+const config = __webpack_require__(16);
 
 /**
  * ### При установке параметров сеанса
@@ -8031,7 +7987,7 @@ module.exports = prm => {
 };
 
 /***/ }),
-/* 17 */
+/* 16 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -8086,7 +8042,7 @@ module.exports = function settings(prm) {
 };
 
 /***/ }),
-/* 18 */
+/* 17 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -8162,10 +8118,7 @@ module.exports = function settings(prm) {
 * @class CatBranches
 * @extends CatObj
 * @constructor 
-*/class CatBranches extends CatObj{get suffix(){return this._getter('suffix');}set suffix(v){this._setter('suffix',v);}get direct(){return this._getter('direct');}set direct(v){this._setter('direct',v);}get use(){return this._getter('use');}set use(v){this._setter('use',v);}get parent(){return this._getter('parent');}set parent(v){this._setter('parent',v);}get organizations(){return this._getter_ts('organizations');}set organizations(v){this._setter_ts('organizations',v);}get partners(){return this._getter_ts('partners');}set partners(v){this._setter_ts('partners',v);}get divisions(){return this._getter_ts('divisions');}set divisions(v){this._setter_ts('divisions',v);}get price_types(){return this._getter_ts('price_types');}set price_types(v){this._setter_ts('price_types',v);}get keys(){return this._getter_ts('keys');}set keys(v){this._setter_ts('keys',v);}}$p.CatBranches=CatBranches;class CatBranchesOrganizationsRow extends TabularSectionRow{get acl_obj(){return this._getter('acl_obj');}set acl_obj(v){this._setter('acl_obj',v);}get by_default(){return this._getter('by_default');}set by_default(v){this._setter('by_default',v);}}$p.CatBranchesOrganizationsRow=CatBranchesOrganizationsRow;class CatBranchesPartnersRow extends TabularSectionRow{get acl_obj(){return this._getter('acl_obj');}set acl_obj(v){this._setter('acl_obj',v);}get by_default(){return this._getter('by_default');}set by_default(v){this._setter('by_default',v);}}$p.CatBranchesPartnersRow=CatBranchesPartnersRow;class CatBranchesDivisionsRow extends TabularSectionRow{get acl_obj(){return this._getter('acl_obj');}set acl_obj(v){this._setter('acl_obj',v);}get by_default(){return this._getter('by_default');}set by_default(v){this._setter('by_default',v);}}$p.CatBranchesDivisionsRow=CatBranchesDivisionsRow;class CatBranchesPrice_typesRow extends TabularSectionRow{get acl_obj(){return this._getter('acl_obj');}set acl_obj(v){this._setter('acl_obj',v);}}$p.CatBranchesPrice_typesRow=CatBranchesPrice_typesRow;class CatBranchesKeysRow extends TabularSectionRow{get acl_obj(){return this._getter('acl_obj');}set acl_obj(v){this._setter('acl_obj',v);}}$p.CatBranchesKeysRow=CatBranchesKeysRow;class CatBranchesManager extends CatManager{constructor(owner,class_name){super(owner,class_name);// после загрузки данных, надо настроить отборы в метаданных полей рисовалки
-$p.adapters.pouch.once("pouch_complete_loaded",()=>{if($p.job_prm.properties&&!$p.current_user.branch.empty()&&$p.job_prm.builder){const{ПараметрВыбора}=$p.enm.parameters_keys_applying;const{furn,sys}=$p.job_prm.properties;// накапливаем
-$p.current_user.branch.load().then(({keys})=>{const branch_filter=$p.job_prm.builder.branch_filter={furn:[],sys:[]};keys.forEach(({acl_obj})=>{if(acl_obj.applying==ПараметрВыбора){acl_obj.params.forEach(({property,value})=>{if(property===furn){branch_filter.furn.push(value);}else if(property===sys){branch_filter.sys.push(value);}});}});return branch_filter;}).then(branch_filter=>{// применяем
-if(branch_filter.furn.length){const mf=$p.cat.characteristics.metadata('constructions').fields.furn;mf.choice_params.push({name:"ref",path:{inh:branch_filter.furn}});}if(branch_filter.sys.length){const mf=$p.dp.buyers_order.metadata().fields.sys;mf.choice_params=[{name:"ref",path:{inh:branch_filter.sys}}];}});}});}}$p.cat.create('branches',CatBranchesManager,false);/**
+*/class CatBranches extends CatObj{get suffix(){return this._getter('suffix');}set suffix(v){this._setter('suffix',v);}get direct(){return this._getter('direct');}set direct(v){this._setter('direct',v);}get use(){return this._getter('use');}set use(v){this._setter('use',v);}get parent(){return this._getter('parent');}set parent(v){this._setter('parent',v);}get organizations(){return this._getter_ts('organizations');}set organizations(v){this._setter_ts('organizations',v);}get partners(){return this._getter_ts('partners');}set partners(v){this._setter_ts('partners',v);}get divisions(){return this._getter_ts('divisions');}set divisions(v){this._setter_ts('divisions',v);}get price_types(){return this._getter_ts('price_types');}set price_types(v){this._setter_ts('price_types',v);}get keys(){return this._getter_ts('keys');}set keys(v){this._setter_ts('keys',v);}}$p.CatBranches=CatBranches;class CatBranchesOrganizationsRow extends TabularSectionRow{get acl_obj(){return this._getter('acl_obj');}set acl_obj(v){this._setter('acl_obj',v);}get by_default(){return this._getter('by_default');}set by_default(v){this._setter('by_default',v);}}$p.CatBranchesOrganizationsRow=CatBranchesOrganizationsRow;class CatBranchesPartnersRow extends TabularSectionRow{get acl_obj(){return this._getter('acl_obj');}set acl_obj(v){this._setter('acl_obj',v);}get by_default(){return this._getter('by_default');}set by_default(v){this._setter('by_default',v);}}$p.CatBranchesPartnersRow=CatBranchesPartnersRow;class CatBranchesDivisionsRow extends TabularSectionRow{get acl_obj(){return this._getter('acl_obj');}set acl_obj(v){this._setter('acl_obj',v);}get by_default(){return this._getter('by_default');}set by_default(v){this._setter('by_default',v);}}$p.CatBranchesDivisionsRow=CatBranchesDivisionsRow;class CatBranchesPrice_typesRow extends TabularSectionRow{get acl_obj(){return this._getter('acl_obj');}set acl_obj(v){this._setter('acl_obj',v);}}$p.CatBranchesPrice_typesRow=CatBranchesPrice_typesRow;class CatBranchesKeysRow extends TabularSectionRow{get acl_obj(){return this._getter('acl_obj');}set acl_obj(v){this._setter('acl_obj',v);}}$p.CatBranchesKeysRow=CatBranchesKeysRow;$p.cat.create('branches');/**
 * ### Справочник Валюты
 * Валюты, используемые при расчетах
 * @class CatCurrencies
@@ -8514,13 +8467,13 @@ unload_obj(){}}$p.cat.create('users',CatUsersManager,true);/**
 */class RepMaterials_demand extends DataProcessorObj{get calc_order(){return this._getter('calc_order');}set calc_order(v){this._setter('calc_order',v);}get formula(){return this._getter('formula');}set formula(v){this._setter('formula',v);}get scheme(){return this._getter('scheme');}set scheme(v){this._setter('scheme',v);}get production(){return this._getter_ts('production');}set production(v){this._setter_ts('production',v);}get specification(){return this._getter_ts('specification');}set specification(v){this._setter_ts('specification',v);}}$p.RepMaterials_demand=RepMaterials_demand;class RepMaterials_demandProductionRow extends TabularSectionRow{get use(){return this._getter('use');}set use(v){this._setter('use',v);}get characteristic(){return this._getter('characteristic');}set characteristic(v){this._setter('characteristic',v);}get elm(){return this._getter('elm');}set elm(v){this._setter('elm',v);}get qty(){return this._getter('qty');}set qty(v){this._setter('qty',v);}}$p.RepMaterials_demandProductionRow=RepMaterials_demandProductionRow;class RepMaterials_demandSpecificationRow extends TabularSectionRow{get calc_order(){return this._getter('calc_order');}set calc_order(v){this._setter('calc_order',v);}get product(){return this._getter('product');}set product(v){this._setter('product',v);}get cnstr(){return this._getter('cnstr');}set cnstr(v){this._setter('cnstr',v);}get elm(){return this._getter('elm');}set elm(v){this._setter('elm',v);}get nom(){return this._getter('nom');}set nom(v){this._setter('nom',v);}get article(){return this._getter('article');}set article(v){this._setter('article',v);}get clr(){return this._getter('clr');}set clr(v){this._setter('clr',v);}get characteristic(){return this._getter('characteristic');}set characteristic(v){this._setter('characteristic',v);}get nom_kind(){return this._getter('nom_kind');}set nom_kind(v){this._setter('nom_kind',v);}get qty(){return this._getter('qty');}set qty(v){this._setter('qty',v);}get len(){return this._getter('len');}set len(v){this._setter('len',v);}get width(){return this._getter('width');}set width(v){this._setter('width',v);}get s(){return this._getter('s');}set s(v){this._setter('s',v);}get material(){return this._getter('material');}set material(v){this._setter('material',v);}get grouping(){return this._getter('grouping');}set grouping(v){this._setter('grouping',v);}get totqty(){return this._getter('totqty');}set totqty(v){this._setter('totqty',v);}get totqty1(){return this._getter('totqty1');}set totqty1(v){this._setter('totqty1',v);}get alp1(){return this._getter('alp1');}set alp1(v){this._setter('alp1',v);}get alp2(){return this._getter('alp2');}set alp2(v){this._setter('alp2',v);}get sz(){return this._getter('sz');}set sz(v){this._setter('sz',v);}get price(){return this._getter('price');}set price(v){this._setter('price',v);}get amount(){return this._getter('amount');}set amount(v){this._setter('amount',v);}get amount_marged(){return this._getter('amount_marged');}set amount_marged(v){this._setter('amount_marged',v);}}$p.RepMaterials_demandSpecificationRow=RepMaterials_demandSpecificationRow;$p.rep.create('materials_demand');})();};
 
 /***/ }),
-/* 19 */
+/* 18 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
 
 
-const request = __webpack_require__(20);
+const request = __webpack_require__(19);
 
 module.exports = async (ctx, $p) => {
 
@@ -8578,13 +8531,13 @@ module.exports = async (ctx, $p) => {
 };
 
 /***/ }),
-/* 20 */
+/* 19 */
 /***/ (function(module, exports) {
 
 module.exports = require("request");
 
 /***/ }),
-/* 21 */
+/* 20 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -8593,21 +8546,21 @@ module.exports = require("request");
 const debug = __webpack_require__(0)('wb:router');
 debug('start');
 
-const Router = __webpack_require__(22);
+const Router = __webpack_require__(21);
 const router = Router({ prefix: '/prm' });
 
-router.loadMethods().get('/:class/:ref', __webpack_require__(2)).post('/:class/:ref', __webpack_require__(23));
+router.loadMethods().get('/:class/:ref', __webpack_require__(2)).post('/:class/:ref', __webpack_require__(22));
 
 module.exports = router;
 
 /***/ }),
-/* 22 */
+/* 21 */
 /***/ (function(module, exports) {
 
 module.exports = require("koa-better-router");
 
 /***/ }),
-/* 23 */
+/* 22 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
