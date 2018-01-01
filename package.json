@@ -22,7 +22,8 @@
     "md5-file": "^3.2.3",
     "metadata-abstract-ui": "^2.0.16-beta.44",
     "metadata-core": "^2.0.16-beta.44",
-    "metadata-pouchdb": "^2.0.16-beta.44"
+    "metadata-pouchdb": "^2.0.16-beta.44",
+    "request": "^2.83.0"
   },
   "devDependencies": {
     "babel-core": "^6.26.0",
