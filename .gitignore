@@ -9,6 +9,7 @@ src/modifiers/
 localstorage/
 /config/test.env
 /src/meta.json
+/index.js.map
 
 # npm files
 node_modules

@@ -15,8 +15,11 @@ debug('created');
 // эмулируем излучатель событий dhtmlx
 require('./dhtmlx_eve')($p);
 
-// обеспечиваем совместимость DataManager с v0.12
-require('./meta_pouchdb')($p.classes.DataManager.prototype);
+// модификаторы data-объектов в старом формате
+const modifiers = require('./modifiers')
+
+// модификаторы data-объектов в новом формате
+import modifiers_new from './chartscharacteristics';
 
 
 // инициализируем параметры сеанса и метаданные
@@ -28,9 +31,6 @@ require('./meta_pouchdb')($p.classes.DataManager.prototype);
   // функция инициализации структуры метаданных
   const meta_init = require('./init');
 
-  // модификаторы data-объектов
-  const modifiers = require('./modifiers');
-
   // реквизиты подключения к couchdb
   const {user_node} = config_init();
 
@@ -39,6 +39,7 @@ require('./meta_pouchdb')($p.classes.DataManager.prototype);
 
   // подключим модификаторы
   modifiers($p);
+  modifiers_new($p);
   debug('inited & modified');
 
   // загружаем кешируемые справочники в ram и начинаем следить за изменениями ram
