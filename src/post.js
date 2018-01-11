@@ -313,9 +313,7 @@ module.exports = async (ctx, next) => {
       case 'docs':
         return await docs(ctx, next);
       default:
-        const point = ctx.params.class.indexOf('.');
-
-        if(point){
+        if(/(doc|cat|cch)\./.test(ctx.params.class)){
           return await doc(ctx, next);
         }
 
