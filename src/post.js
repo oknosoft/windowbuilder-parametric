@@ -149,22 +149,181 @@ async function store(ctx, next) {
   }
 }
 
+async function docs(ctx, next) {
+
+  const {_auth, params, _query} = ctx;
+  const {couch_local, zone} = $p.job_prm;
+
+  const {selector} = _query;
+
+  if (!selector.class_name) {
+    ctx.status = 403;
+    ctx.body = {
+      error: true,
+      message: `Не указан класс объектов в селекторе`,
+    };
+  }
+  else {
+    const _s = {'class_name':selector.class_name};
+    const point = selector.class_name.indexOf('.');
+    const md_class = selector.class_name.substr(0, point);
+    const data_mgr = $p.md.mgr_by_class_name(selector.class_name);
+    const md = data_mgr.metadata();
+
+    if(md.cachable == 'doc') {
+      if (md_class == 'doc') {
+        if (selector.date) {
+          _s.date = selector.date;
+        }
+        else {
+          _s.date = {'$ne': null};
+        }
+      }
+
+      if (selector.search) {
+        _s.search = selector.search;
+      }
+      else {
+        _s.search = {'$ne': null};
+      }
+
+      const predefined_keys = new Set();
+      predefined_keys.add('class_name');
+      predefined_keys.add('date');
+      predefined_keys.add('search');
+
+      for (const key in selector) {
+        if (!predefined_keys.has(key)) {
+          _s[key] = selector[key];
+        }
+      }
+
+      const pouch = new $p.classes.PouchDB(couch_local + zone + '_doc_' + _auth.suffix, {
+        'auth': {
+          'username': _auth.username,
+          'password': _auth.pass
+        }, 'skip_setup': true
+      });
+
+      _query.selector = _s;
+
+      const res = await pouch.find(_query);
+
+      //разыменование
+      res.docs.forEach((doc)=>{
+        representation(doc, md);
+      })
+
+      ctx.body = res;
+    }
+    else
+    {
+      ctx.body = [];
+    }
+  }
+}
+
+function representation(obj, md) {
+  const fake_data_mgr = $p.doc.calc_order;
+
+  function get_new_field(_obj, field, type) {
+    const data_mgr = fake_data_mgr.value_mgr(_obj, field, type, false, _obj[field]);
+
+    if (data_mgr && (data_mgr.metadata().cachable == 'ram' || data_mgr.metadata().cachable == 'doc_ram')) {
+      const field_obj = data_mgr.get(_obj[field]);
+
+      const point = data_mgr.class_name.indexOf('.');
+      const md_class = data_mgr.class_name.substr(0, point);
+
+      const new_field = {'ref': _obj[field]};
+      new_field._mixin(field_obj, (md_class == 'doc') ? ['number_doc', 'date'] : ['id', 'name'], []);
+
+      _obj[field] = new_field;
+
+      return;
+    }
+    return;
+  }
+
+  //реквизиты
+  for (const field in md.fields) {
+    if (obj[field]) {
+      get_new_field(obj, field, md.fields[field].type);
+    }
+  }
+
+  //табличные части
+  for (const ts in md.tabular_sections) {
+    if (obj[ts]) {
+      const fields = md.tabular_sections[ts].fields;
+
+      obj[ts].forEach((row) => {
+        for (const field in fields) {
+          if(row[field]){
+            get_new_field(row, field, fields[field].type);
+          }
+        }
+      })
+
+    }
+  }
+}
+
+async function doc(ctx, next) {
+
+  const {_query, route, params, _auth} = ctx;
+  const ref = route.params.ref;
+  const {couch_local, zone} = $p.job_prm;
+
+  const data_mgr = $p.md.mgr_by_class_name(ctx.params.class);
+  const md = data_mgr.metadata();
+  const res = {'docs':[]};
+
+  if(md.cachable == 'doc'){
+    const pouch = new $p.classes.PouchDB(couch_local + zone + '_doc_' + _auth.suffix, {
+      'auth': {
+        'username': _auth.username,
+        'password': _auth.pass
+      }, 'skip_setup': true
+    });
+
+    const obj = await pouch.get(ctx.params.class + '|' + ref);
+    res.docs.push(obj);
+  }
+  else{
+    const obj = data_mgr.get(ref);
+    res.docs.push(obj);
+  }
+
+  representation(res.docs[0], md);
+
+  ctx.body = res;
+}
+
 module.exports = async (ctx, next) => {
 
   try {
     switch (ctx.params.class) {
-    case 'doc.calc_order':
-      return await calc_order(ctx, next);
-    case 'array':
-      return await array(ctx, next);
-    case 'store':
-      return await store(ctx, next);
-    default:
-      ctx.status = 404;
-      ctx.body = {
-        error: true,
-        message: `Неизвестный класс ${ctx.params.class}`,
-      };
+      case 'doc.calc_order':
+        return await calc_order(ctx, next);
+      case 'array':
+        return await array(ctx, next);
+      case 'store':
+        return await store(ctx, next);
+      case 'docs':
+        return await docs(ctx, next);
+      default:
+        const point = ctx.params.class.indexOf('.');
+
+        if(point){
+          return await doc(ctx, next);
+        }
+
+        ctx.status = 404;
+        ctx.body = {
+          error: true,
+          message: `Неизвестный класс ${ctx.params.class}`,
+        };
     }
   }
   catch (err) {
