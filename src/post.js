@@ -149,6 +149,7 @@ async function store(ctx, next) {
   }
 }
 
+// возвращает список документов
 async function docs(ctx, next) {
 
   const {_auth, params, _query} = ctx;
@@ -164,7 +165,7 @@ async function docs(ctx, next) {
     };
   }
   else {
-    const _s = {'class_name':selector.class_name};
+    const _s = {'class_name': selector.class_name};
     const point = selector.class_name.indexOf('.');
     const md_class = selector.class_name.substr(0, point);
     const data_mgr = $p.md.mgr_by_class_name(selector.class_name);
@@ -184,7 +185,7 @@ async function docs(ctx, next) {
         _s.search = selector.search;
       }
       else {
-        _s.search = {'$ne': null};
+        _s.search = {$ne: null};
       }
 
       const predefined_keys = new Set();
@@ -199,10 +200,11 @@ async function docs(ctx, next) {
       }
 
       const pouch = new $p.classes.PouchDB(couch_local + zone + '_doc_' + _auth.suffix, {
-        'auth': {
-          'username': _auth.username,
-          'password': _auth.pass
-        }, 'skip_setup': true
+        auth: {
+          username: _auth.username,
+          password: _auth.pass
+        },
+        skip_setup: true
       });
 
       _query.selector = _s;
@@ -269,6 +271,7 @@ function representation(obj, md) {
   }
 }
 
+// возаращает конкретный документ по ссылке
 async function doc(ctx, next) {
 
   const {_query, route, params, _auth} = ctx;
@@ -277,14 +280,15 @@ async function doc(ctx, next) {
 
   const data_mgr = $p.md.mgr_by_class_name(ctx.params.class);
   const md = data_mgr.metadata();
-  const res = {'docs':[]};
+  const res = {docs: []};
 
   if(md.cachable == 'doc'){
     const pouch = new $p.classes.PouchDB(couch_local + zone + '_doc_' + _auth.suffix, {
-      'auth': {
-        'username': _auth.username,
-        'password': _auth.pass
-      }, 'skip_setup': true
+      auth: {
+        username: _auth.username,
+        password: _auth.pass
+      },
+      skip_setup: true
     });
 
     const obj = await pouch.get(ctx.params.class + '|' + ref);
@@ -313,9 +317,7 @@ module.exports = async (ctx, next) => {
       case 'docs':
         return await docs(ctx, next);
       default:
-        const point = ctx.params.class.indexOf('.');
-
-        if(point){
+        if(/(doc|cat|cch)\./.test(ctx.params.class)){
           return await doc(ctx, next);
         }
 
