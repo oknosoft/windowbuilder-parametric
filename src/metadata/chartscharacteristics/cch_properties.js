@@ -2,7 +2,7 @@
  * ### Дополнительные методы плана видов характеристик _Свойства объектов_
  * аналог подсистемы _Свойства_ БСП
  *
- * &copy; Evgeniy Malyarov http://www.oknosoft.ru 2014-2017
+ * &copy; Evgeniy Malyarov http://www.oknosoft.ru 2014-2018
  *
  * @module cch_properties
  */

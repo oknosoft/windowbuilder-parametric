@@ -2,7 +2,7 @@ module.exports = function($p) {
 /**
  * Дополнительные методы перечисления Типы соединений
  *
- * &copy; Evgeniy Malyarov http://www.oknosoft.ru 2014-2017
+ * &copy; Evgeniy Malyarov http://www.oknosoft.ru 2014-2018
  *
  * Created 23.12.2015
  *
@@ -84,7 +84,7 @@ module.exports = function($p) {
 /**
  * Дополнительные методы перечисления Типы элементов
  *
- * &copy; Evgeniy Malyarov http://www.oknosoft.ru 2014-2017
+ * &copy; Evgeniy Malyarov http://www.oknosoft.ru 2014-2018
  *
  * @module enm_elm_types
  */
@@ -160,7 +160,7 @@ module.exports = function($p) {
 /**
  * ### Модификаторы перечислений
  *
- * &copy; Evgeniy Malyarov http://www.oknosoft.ru 2014-2017
+ * &copy; Evgeniy Malyarov http://www.oknosoft.ru 2014-2018
  *
  * @module enmums
  *
@@ -301,7 +301,7 @@ module.exports = function($p) {
  * Обрботчики событий after_create, after_load, before_save, after_save, value_change
  * Методы выполняются в контексте текущего объекта this = DocObj
  *
- * &copy; Evgeniy Malyarov http://www.oknosoft.ru 2014-2017
+ * &copy; Evgeniy Malyarov http://www.oknosoft.ru 2014-2018
  *
  * @module cat_characteristics
  *
@@ -660,7 +660,7 @@ $p.cat.characteristics.form_obj = function (pwnd, attr) {
 /**
  * ### Форма выбора типового блока
  *
- * &copy; Evgeniy Malyarov http://www.oknosoft.ru 2014-2017
+ * &copy; Evgeniy Malyarov http://www.oknosoft.ru 2014-2018
  *
  * @module cat_characteristics_form_selection_block
  *
@@ -907,8 +907,7 @@ $p.cat.characteristics.form_obj = function (pwnd, attr) {
 /**
  * ### Дополнительные методы справочника Цвета
  *
- * &copy; Evgeniy Malyarov http://www.oknosoft.ru 2014-2017
- *
+ * &copy; Evgeniy Malyarov http://www.oknosoft.ru 2014-20178
  * @module cat_cnns
  *
  * Created 23.12.2015
@@ -1251,7 +1250,7 @@ $p.CatClrs = class CatClrs extends $p.CatClrs {
 /**
  * ### Дополнительные методы справочника _Соединения_
  *
- * &copy; Evgeniy Malyarov http://www.oknosoft.ru 2014-2017
+ * &copy; Evgeniy Malyarov http://www.oknosoft.ru 2014-2018
  * @module cat_cnns
  * Created 23.12.2015
  */
@@ -1513,7 +1512,7 @@ $p.CatCnns.prototype.__define({
 /**
  * ### Дополнительные методы справочника _Договоры контрагентов_
  *
- * &copy; Evgeniy Malyarov http://www.oknosoft.ru 2014-2017
+ * &copy; Evgeniy Malyarov http://www.oknosoft.ru 2014-2018
  *
  * @module cat_contracts
  *
@@ -1607,7 +1606,7 @@ Object.defineProperties($p.cat.divisions, {
 
 /**
  * ### Дополнительные методы справочника Визуализация элементов
- * &copy; Evgeniy Malyarov http://www.oknosoft.ru 2014-2017
+ * &copy; Evgeniy Malyarov http://www.oknosoft.ru 2014-2018
  *
  * Created 08.04.2016
  *
@@ -1701,7 +1700,7 @@ $p.CatElm_visualization.prototype.__define({
 
 /**
  *
- * &copy; Evgeniy Malyarov http://www.oknosoft.ru 2014-2017
+ * &copy; Evgeniy Malyarov http://www.oknosoft.ru 2014-2018
  *
  * Created 17.04.2016
  *
@@ -1806,7 +1805,7 @@ $p.CatFormulas.prototype.__define({
  * Дополнительные методы справочника Фурнитура
  *
  * Created 23.12.2015<br />
- * &copy; http://www.oknosoft.ru 2014-2017
+ * &copy; http://www.oknosoft.ru 2014-2018
  * @author Evgeniy Malyarov
  * @module cat_furns
  */
@@ -2213,7 +2212,7 @@ $p.CatFurnsSpecificationRow = class CatFurnsSpecificationRow extends $p.CatFurns
  * Дополнительные методы справочника Вставки
  *
  * Created 23.12.2015<br />
- * &copy; http://www.oknosoft.ru 2014-2017
+ * &copy; http://www.oknosoft.ru 2014-2018
  * @author Evgeniy Malyarov
  * @module cat_inserts
  */
@@ -2788,7 +2787,7 @@ $p.cat.insert_bind.__define({
 /**
  * Дополнительные методы справочника Номенклатура
  *
- * &copy; Evgeniy Malyarov http://www.oknosoft.ru 2014-2017
+ * &copy; Evgeniy Malyarov http://www.oknosoft.ru 2014-2018
  * @module cat_nom
  * Created 23.12.2015
  */
@@ -3022,7 +3021,7 @@ $p.CatNom.prototype.__define({
 /**
  * ### Дополнительные методы справочника Контрагенты
  *
- * &copy; Evgeniy Malyarov http://www.oknosoft.ru 2014-2017
+ * &copy; Evgeniy Malyarov http://www.oknosoft.ru 2014-2018
  *
  * @module cat_partners
  */
@@ -3106,7 +3105,7 @@ $p.CatPartners.prototype.__define({
  * Дополнительные методы справочника Системы (Параметры продукции)
  *
  * Created 23.12.2015<br />
- * &copy; http://www.oknosoft.ru 2014-2017
+ * &copy; http://www.oknosoft.ru 2014-2018
  * @author Evgeniy Malyarov
  * @module cat_production_params
  */
@@ -3291,7 +3290,7 @@ $p.CatProduction_params.prototype.__define({
  * Обрботчики событий after_create, after_load, before_save, after_save, value_change
  * Методы выполняются в контексте текущего объекта this = DocObj
  *
- * &copy; Evgeniy Malyarov http://www.oknosoft.ru 2014-2017
+ * &copy; Evgeniy Malyarov http://www.oknosoft.ru 2014-2018
  *
  * @module doc_calc_order
  */
@@ -4449,7 +4448,7 @@ $p.DocCalc_orderProductionRow.pfields = 'price_internal,quantity,discount_percen
 /**
  * форма списка документов Расчет-заказ. публикуемый метод: doc.calc_order.form_list(o, pwnd, attr)
  *
- * &copy; Evgeniy Malyarov http://www.oknosoft.ru 2014-2017
+ * &copy; Evgeniy Malyarov http://www.oknosoft.ru 2014-2018
  *
  * @module doc_calc_order_form_list
  */
@@ -4611,7 +4610,7 @@ $p.doc.calc_order.form_list = function(pwnd, attr, handlers){
 /**
  * форма документа Расчет-заказ. публикуемый метод: doc.calc_order.form_obj(o, pwnd, attr)
  *
- * &copy; Evgeniy Malyarov http://www.oknosoft.ru 2014-2017
+ * &copy; Evgeniy Malyarov http://www.oknosoft.ru 2014-2018
  *
  * @module doc_calc_order_form_obj
  */
@@ -5333,7 +5332,7 @@ $p.doc.calc_order.form_list = function(pwnd, attr, handlers){
 /**
  * форма выбора документов Расчет-заказ. публикуемый метод: doc.calc_order.form_selection(pwnd, attr)
  *
- * &copy; Evgeniy Malyarov http://www.oknosoft.ru 2014-2017
+ * &copy; Evgeniy Malyarov http://www.oknosoft.ru 2014-2018
  *
  * @module doc_calc_order_form_selection
  */
@@ -5371,7 +5370,7 @@ $p.doc.calc_order.form_selection = function(pwnd, attr){
 /**
  * ### Отчеты по документу Расчет
  *
- * &copy; Evgeniy Malyarov http://www.oknosoft.ru 2014-2017
+ * &copy; Evgeniy Malyarov http://www.oknosoft.ru 2014-2018
  *
  * Created 23.06.2016
  *
@@ -5533,7 +5532,7 @@ $p.doc.calc_order.__define({
 
 /**
  * ### Модуль менеджера и документа _Оплата платежной картой_
- * &copy; Evgeniy Malyarov http://www.oknosoft.ru 2014-2017
+ * &copy; Evgeniy Malyarov http://www.oknosoft.ru 2014-2018
  *
  * @module doc_credit_card_order
  *
@@ -5547,7 +5546,7 @@ $p.DocCredit_card_order.prototype.before_save = function () {
 
 /**
  * ### Модуль менеджера и документа _Платежное поручение входящее_
- * &copy; Evgeniy Malyarov http://www.oknosoft.ru 2014-2017
+ * &copy; Evgeniy Malyarov http://www.oknosoft.ru 2014-2018
  *
  * @module doc_debit_bank_order
  *
@@ -5561,7 +5560,7 @@ $p.DocDebit_bank_order.prototype.before_save = function () {
 
 /**
  * ### Модуль менеджера и документа _Приходный кассовый ордер_
- * &copy; Evgeniy Malyarov http://www.oknosoft.ru 2014-2017
+ * &copy; Evgeniy Malyarov http://www.oknosoft.ru 2014-2018
  *
  * @module doc_debit_cash_order
  *
@@ -5576,7 +5575,7 @@ $p.DocDebit_cash_order.prototype.before_save = function () {
 /**
  * ### Модуль менеджера и документа Установка цен номенклатуры
  *
- * &copy; Evgeniy Malyarov http://www.oknosoft.ru 2014-2017
+ * &copy; Evgeniy Malyarov http://www.oknosoft.ru 2014-2018
  *
  * @module doc_nom_prices_setup
  * Created 28.07.2016
@@ -5687,7 +5686,7 @@ $p.on('tabular_paste', (clip) => {
 
 /**
  * ### Модуль менеджера и документа _Реализация товаров и услуг_
- * &copy; Evgeniy Malyarov http://www.oknosoft.ru 2014-2017
+ * &copy; Evgeniy Malyarov http://www.oknosoft.ru 2014-2018
  *
  * @module doc_selling
  *
@@ -5706,7 +5705,7 @@ $p.DocSelling.prototype.before_save = function () {
  * ### Модуль Ценообразование
  * Аналог УПзП-шного __ЦенообразованиеСервер__
  *
- * &copy; Evgeniy Malyarov http://www.oknosoft.ru 2014-2017
+ * &copy; Evgeniy Malyarov http://www.oknosoft.ru 2014-2018
  * @module  glob_pricing
  */
 
@@ -6305,7 +6304,7 @@ $p.pricing = new Pricing($p);
  * Аналог УПзП-шного __ПостроительИзделийСервер__
  *
  *
- * &copy; Evgeniy Malyarov http://www.oknosoft.ru 2014-2017
+ * &copy; Evgeniy Malyarov http://www.oknosoft.ru 2014-2018
  *
  * @module  glob_products_building
  * Created 26.05.2015
@@ -7261,7 +7260,7 @@ $p.products_building = new ProductsBuilding(true);
  * Аналог УПзП-шного __ФормированиеСпецификацийСервер__
  * Содержит методы расчета спецификации без привязки к построителю. Например, по регистру корректировки спецификации
  *
- * &copy; Evgeniy Malyarov http://www.oknosoft.ru 2014-2017
+ * &copy; Evgeniy Malyarov http://www.oknosoft.ru 2014-2018
  *
  * @module  glob_spec_building
  * Created 26.05.2015
@@ -7387,7 +7386,7 @@ $p.spec_building = new SpecBuilding($p);
 
 /**
  * Составной тип в поле trans документов оплаты и отгрузки
- * &copy; Evgeniy Malyarov http://www.oknosoft.ru 2014-2017
+ * &copy; Evgeniy Malyarov http://www.oknosoft.ru 2014-2018
  *
  * @module glob_value_mgr
  *

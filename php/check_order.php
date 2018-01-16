@@ -2,7 +2,7 @@
 /**
 * @package		windowbuilder-parametric
 * @url			https://github.com/oknosoft/windowbuilder-parametric
-* @copyright	(C) 2014-2017 http://www.oknosoft.ru All rights reserved.
+* @copyright	(C) 2014-2018 http://www.oknosoft.ru All rights reserved.
 */
 
 $auth = array(
