@@ -304,6 +304,12 @@ async function doc(ctx, next) {
   ctx.body = res;
 }
 
+//Запускает загрузку данных из doc
+async function load_doc_ram(ctx, next) {
+  $p.adapters.pouch.load_doc_ram();
+  ctx.body = {'doc_ram_loading_started': true};
+}
+
 module.exports = async (ctx, next) => {
 
   try {
@@ -316,6 +322,8 @@ module.exports = async (ctx, next) => {
         return await store(ctx, next);
       case 'docs':
         return await docs(ctx, next);
+      case 'load_doc_ram':
+        return load_doc_ram(ctx, next);
       default:
         if(/(doc|cat|cch)\./.test(ctx.params.class)){
           return await doc(ctx, next);
