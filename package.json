@@ -10,7 +10,8 @@
     "npm": "^5.5"
   },
   "scripts": {
-    "start": "node --inspect-brk ./index",
+    "start": "node ./index",
+    "debug": "node --inspect-brk ./index",
     "build": "node ./scripts/build",
     "meta:prebuild": "node ./scripts/meta.prebuild",
     "meta:link": "node ./scripts/meta.link"
