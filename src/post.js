@@ -157,21 +157,56 @@ async function docs(ctx, next) {
 
   const {selector} = _query;
 
+  //class__name (имя класса) должен быть всегда
   if (!selector.class_name) {
     ctx.status = 403;
     ctx.body = {
       error: true,
       message: `Не указан класс объектов в селекторе`,
     };
+    return;
   }
-  else {
-    const _s = {'class_name': selector.class_name};
-    const point = selector.class_name.indexOf('.');
-    const md_class = selector.class_name.substr(0, point);
-    const data_mgr = $p.md.mgr_by_class_name(selector.class_name);
-    const md = data_mgr.metadata();
 
-    if(md.cachable == 'doc') {
+  const point = selector.class_name.indexOf('.');
+  const md_class = selector.class_name.substr(0, point);
+  const data_mgr = $p.md.mgr_by_class_name(selector.class_name);
+  const md = data_mgr.metadata();
+
+  //Работаем только с данными, кешируемыми в doc, для остального есть отдельный endpoint
+  if(md.cachable == 'doc') {
+    //Сразу соединяемся с pouch базы партнера, чтобы брать данные из нее
+    const pouch = new $p.classes.PouchDB(couch_local + zone + '_doc_' + _auth.suffix, {
+      auth: {
+        username: _auth.username,
+        password: _auth.pass
+      },
+      skip_setup: true
+    });
+
+    const {class_name} = selector;
+
+    //Если в селекторе есть _id, то запрошен перечень конкретных ссылок, и mango query не нужен
+    if ('_id' in selector) {
+      const keys = [];
+
+
+      if (Array.isArray(selector._id)) {
+        selector._id.forEach((key) => {
+          keys.push(class_name + "|" + key);
+        })
+      }
+      else {
+        keys.push(class_name + "|" + selector._id);
+      }
+
+      const res = await pouch.allDocs({'include_docs': true, 'inclusive_end': true, 'keys': keys});
+
+      ctx.body = res;
+    }
+    else {
+      //Нужен mango query, поэтому пересоберем селектор, чтобы были правильные поля в правильном порядке
+      const _s = {'class_name': class_name};
+
       if (md_class == 'doc') {
         if (selector.date) {
           _s.date = selector.date;
@@ -193,38 +228,32 @@ async function docs(ctx, next) {
       predefined_keys.add('date');
       predefined_keys.add('search');
 
+      //Добавим в селектор остальные поля, кроме class_name, date и search
       for (const key in selector) {
         if (!predefined_keys.has(key)) {
           _s[key] = selector[key];
         }
       }
 
-      const pouch = new $p.classes.PouchDB(couch_local + zone + '_doc_' + _auth.suffix, {
-        auth: {
-          username: _auth.username,
-          password: _auth.pass
-        },
-        skip_setup: true
-      });
-
       _query.selector = _s;
 
       const res = await pouch.find(_query);
 
-      //разыменование
-      res.docs.forEach((doc)=>{
+      //расчет презентаций - кода, номера документа, наименования и т.д. для ссылочных реквизитов
+      res.docs.forEach((doc) => {
         representation(doc, md);
       })
 
       ctx.body = res;
     }
-    else
-    {
-      ctx.body = [];
-    }
+  }
+  else {
+    ctx.body = [];
   }
 }
 
+//Функция смотрит на реквизиты объекта, и подменяет ссылки на объекты,
+//содержащие основные данные - код, наименование, номер документа, и саму ссылку
 function representation(obj, md) {
   const fake_data_mgr = $p.doc.calc_order;
 
@@ -260,6 +289,7 @@ function representation(obj, md) {
       const fields = md.tabular_sections[ts].fields;
 
       obj[ts].forEach((row) => {
+        //реквизиты табличных частей
         for (const field in fields) {
           if(row[field]){
             get_new_field(row, field, fields[field].type);
