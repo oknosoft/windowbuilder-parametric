@@ -11,7 +11,7 @@
   },
   "scripts": {
     "start": "node ./index",
-    "debug": "node --inspect-brk ./index",
+    "debug": "node --inspect ./index",
     "build": "node ./scripts/build",
     "meta:prebuild": "node ./scripts/meta.prebuild",
     "meta:link": "node ./scripts/meta.link"
