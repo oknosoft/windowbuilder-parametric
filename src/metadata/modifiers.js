@@ -1534,24 +1534,20 @@ $p.cat.contracts.__define({
 	},
 
 	by_partner_and_org: {
-		value: function (partner, organization, contract_kind) {
-			if(!contract_kind)
-				contract_kind = $p.enm.contract_kinds.СПокупателем;
+    value: function (partner, organization, contract_kind = $p.enm.contract_kinds.СПокупателем) {
 
-			const main_contract = partner.main_contract;
+      const {main_contract} = $p.cat.partners.get(partner);
 
-			//Если у контрагента есть основной договор, и он подходит по виду договора и организации,
+      //Если у контрагента есть основной договор, и он подходит по виду договора и организации,
       // возвращаем его, не бегая по массиву
-			if(main_contract.contract_kind == contract_kind && main_contract.organization == organization){
-			  return main_contract;
+      if(main_contract && main_contract.contract_kind == contract_kind && main_contract.organization == organization){
+        return main_contract;
       }
 
-			var res = this.find_rows({owner: partner, organization: organization, contract_kind: contract_kind});
-			res.sort(function (a, b) {
-				return a.date > b.date;
-			});
-			return res.length ? res[0] : this.get();
-		}
+      const res = this.find_rows({owner: partner, organization: organization, contract_kind: contract_kind});
+      res.sort((a, b) => a.date > b.date);
+      return res.length ? res[0] : this.get();
+    }
 	}
 
 
@@ -2212,6 +2208,7 @@ $p.CatFurnsSpecificationRow = class CatFurnsSpecificationRow extends $p.CatFurns
   fields.nom_set = fields.nom;
 })($p);
 
+
 /**
  * Дополнительные методы справочника Вставки
  *
@@ -2221,6 +2218,11 @@ $p.CatFurnsSpecificationRow = class CatFurnsSpecificationRow extends $p.CatFurns
  * @module cat_inserts
  */
 
+// подписываемся на событие после загрузки из pouchdb-ram и готовности предопределенных
+$p.md.once('predefined_elmnts_inited', () => {
+  $p.cat.scheme_settings.find_schemas('dp.buyers_order.production');
+});
+
 $p.cat.inserts.__define({
 
 	_inserts_types_filling: {
@@ -2228,6 +2230,92 @@ $p.cat.inserts.__define({
 			$p.enm.inserts_types.Заполнение
 		]
 	},
+
+  ItemData: {
+    value: class ItemData {
+      constructor(item, Renderer) {
+
+        this.Renderer = Renderer;
+        this.count = 0;
+
+        // индивидуальные классы строк
+        class ItemRow extends $p.DpBuyers_orderProductionRow {
+        }
+
+        this.ProductionRow = ItemRow;
+
+        // получаем возможные параметры вставок данного типа
+        const prms = new Set();
+        $p.cat.inserts.find_rows({available: true, insert_type: item}, (inset) => {
+          inset.used_params.forEach((param) => {
+            !param.is_calculated && prms.add(param);
+          });
+          inset.specification.forEach(({nom}) => {
+            const {used_params} = nom;
+            used_params && used_params.forEach((param) => {
+              !param.is_calculated && prms.add(param);
+            });
+          });
+        });
+
+        // индивидуальные метаданные строк
+        const meta = $p.dp.buyers_order.metadata('production');
+        this.meta = meta._clone();
+
+        // отбор по типу вставки
+        this.meta.fields.inset.choice_params[0].path = item;
+
+        const changed = new Set();
+
+        for (const param of prms) {
+
+          // корректируем схему
+          $p.cat.scheme_settings.find_rows({obj: 'dp.buyers_order.production', name: item.name}, (scheme) => {
+            if(!scheme.fields.find({field: param.ref})) {
+              // добавляем строку с новым полем
+              const row = scheme.fields.add({
+                field: param.ref,
+                caption: param.caption,
+                use: true,
+              });
+              const note = scheme.fields.find({field: 'note'});
+              note && scheme.fields.swap(row, note);
+
+              changed.add(scheme);
+            }
+          });
+
+          // корректируем метаданные
+          const mf = this.meta.fields[param.ref] = {
+            synonym: param.caption,
+            type: param.type,
+          };
+          if(param.type.types.some(type => type === 'cat.property_values')) {
+            mf.choice_params = [{name: 'owner', path: param}];
+          }
+
+          // корректируем класс строки
+          Object.defineProperty(ItemRow.prototype, param.ref, {
+            get: function () {
+              const {product_params} = this._owner._owner;
+              const row = product_params.find({elm: this.row, param}) || product_params.add({elm: this.row, param});
+              return row.value;
+            },
+            set: function (v) {
+              const {product_params} = this._owner._owner;
+              const row = product_params.find({elm: this.row, param}) || product_params.add({elm: this.row, param});
+              row.value = v;
+            }
+          });
+        }
+
+        for(const scheme of changed) {
+          scheme.save();
+        }
+
+      }
+    }
+  },
 
 	by_thickness: {
 		value: function (min, max) {
@@ -2272,14 +2360,30 @@ $p.CatInserts = class CatInserts extends $p.CatInserts {
   nom(elm, strict) {
 
     const {_data} = this;
-    if(!strict && _data.nom){
+
+    if(!strict && !elm && _data.nom) {
       return _data.nom;
     }
 
     const main_rows = [];
     let _nom;
 
-    this.specification.find_rows({is_main_elm: true}, (row) => main_rows.push(row));
+    const {check_params} = ProductsBuilding;
+
+    this.specification.find_rows({is_main_elm: true}, (row) => {
+      // если есть элемент, фильтруем по параметрам
+      if(elm && !check_params({
+          params: this.selection_params,
+          ox: elm.project.ox,
+          elm: elm,
+          row_spec: row,
+          cnstr: 0,
+          origin: elm.fake_origin || 0,
+        })) {
+        return;
+      }
+      main_rows.push(row)
+    });
 
     if(!main_rows.length && !strict && this.specification.count()){
       main_rows.push(this.specification.get(0))
@@ -2429,15 +2533,14 @@ $p.CatInserts = class CatInserts extends $p.CatInserts {
         if(!elm.joined_imposts(true)){
           return false;
         }
-
-      }else if(row.impost_fixation == $p.enm.impost_mount_options.НетКрепленийИмпостовИРам){
+      }
+      else if(row.impost_fixation == $p.enm.impost_mount_options.НетКрепленийИмпостовИРам){
         if(elm.joined_imposts(true)){
           return false;
         }
       }
       is_tabular = false;
     }
-
 
     if(!is_tabular || by_perimetr || row.count_calc_method != $p.enm.count_calculating_ways.ПоПериметру){
       if(row.lmin > len || (row.lmax < len && row.lmax > 0)){
@@ -2507,7 +2610,7 @@ $p.CatInserts = class CatInserts extends $p.CatInserts {
       }
     }
 
-    this.specification.each((row) => {
+    this.specification.forEach((row) => {
 
       // Проверяем ограничения строки вставки
       if(!check_restrictions(row, elm, insert_type == Профиль, len_angl)){
@@ -2743,9 +2846,9 @@ $p.CatInserts = class CatInserts extends $p.CatInserts {
    */
   get used_params() {
     const res = [];
-    this.selection_params.each((row) => {
-      if(!row.param.empty() && res.indexOf(row.param) == -1){
-        res.push(row.param)
+    this.selection_params.forEach(({param}) => {
+      if(!param.empty() && res.indexOf(param) == -1){
+        res.push(param)
       }
     });
     return res;
@@ -4095,7 +4198,17 @@ $p.DocCalc_order = class DocCalc_order extends $p.DocCalc_order {
       .then((ox) => {
         // если указана строка-генератор, заполняем реквизиты
         if(row_spec instanceof $p.DpBuyers_orderProductionRow) {
-          ox.owner = row_spec.inset.nom(elm, true);
+
+          if(params) {
+            params.find_rows({elm: row_spec.row}, (prow) => {
+              ox.params.add(prow, true).inset = row_spec.inset;
+            });
+          }
+
+          elm.project = {ox};
+          elm.fake_origin = row_spec.inset;
+
+          ox.owner = row_spec.inset.nom(elm);
           ox.origin = row_spec.inset;
           ox.x = row_spec.len;
           ox.y = row_spec.height;
@@ -4104,11 +4217,6 @@ $p.DocCalc_order = class DocCalc_order extends $p.DocCalc_order {
           ox.clr = row_spec.clr;
           ox.note = row_spec.note;
 
-          if(params) {
-            params.find_rows({elm: row_spec.row}, (prow) => {
-              ox.params.add(prow, true).inset = row_spec.inset;
-            });
-          }
         }
 
         // устанавливаем свойства в строке заказа
@@ -6099,13 +6207,6 @@ class Pricing {
       prm.spec.aggregate([], ["amount_marged"]) :
       this.nom_price(calc_order_row.nom, calc_order_row.characteristic, price_type.price_type_sale, prm, {});
 
-    let extra_charge = $p.wsql.get_user_param("surcharge_internal", "number");
-
-    // если пересчет выполняется менеджером, используем наценку по умолчанию
-    if(!$p.current_user.partners_uids.length || !extra_charge){
-      extra_charge = price_type.extra_charge_external;
-    }
-
     // цена продажи
     if(price_cost){
       calc_order_row.price = price_cost.round(2);
@@ -6119,13 +6220,16 @@ class Pricing {
       calc_order_row.price * ((100 - calc_order_row.discount_percent)/100) / calc_order_row.first_cost : 0;
 
 
-    // TODO: Рассчитаем цену и сумму ВНУТР или ДИЛЕРСКУЮ цену и скидку
-    if(extra_charge){
-      calc_order_row.price_internal = (calc_order_row.price *
-      (100 - calc_order_row.discount_percent)/100 * (100 + extra_charge)/100).round(2);
-
-      // TODO: учесть формулу
+    // Рассчитаем цену и сумму ВНУТР или ДИЛЕРСКУЮ цену и скидку
+    let extra_charge = $p.wsql.get_user_param("surcharge_internal", "number");
+    // если пересчет выполняется менеджером, используем наценку по умолчанию
+    if(!$p.current_user.partners_uids.length || !extra_charge){
+      extra_charge = price_type.extra_charge_external || 0;
     }
+
+    // TODO: учесть формулу
+    calc_order_row.price_internal = (calc_order_row.price *
+      (100 - calc_order_row.discount_percent)/100 * (100 + extra_charge)/100).round(2);
 
     // Эмулируем событие окончания редактирования, чтобы единообразно пересчитать строку табчасти
     !prm.hand_start && calc_order_row.value_change("price", {}, calc_order_row.price, true);
