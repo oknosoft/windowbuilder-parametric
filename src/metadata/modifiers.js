@@ -1537,6 +1537,15 @@ $p.cat.contracts.__define({
 		value: function (partner, organization, contract_kind) {
 			if(!contract_kind)
 				contract_kind = $p.enm.contract_kinds.СПокупателем;
+
+			const main_contract = partner.main_contract;
+
+			//Если у контрагента есть основной договор, и он подходит по виду договора и организации,
+      // возвращаем его, не бегая по массиву
+			if(main_contract.contract_kind == contract_kind && main_contract.organization == organization){
+			  return main_contract;
+      }
+
 			var res = this.find_rows({owner: partner, organization: organization, contract_kind: contract_kind});
 			res.sort(function (a, b) {
 				return a.date > b.date;
