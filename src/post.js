@@ -10,8 +10,9 @@ debug('required');
 // формирует json описания продукции заказа
 async function calc_order(ctx, next) {
 
-  const {_query, route} = ctx;
-  const res = {ref: route.params.ref, production: []};
+  const {_query, params} = ctx;
+  const ref = (params.ref || '').toLowerCase();
+  const res = {ref, production: []};
   const {cat, doc, utils, job_prm} = $p;
   const {contracts, nom, inserts, clrs} = cat;
 
@@ -304,11 +305,11 @@ function representation(obj, md) {
 // возаращает конкретный документ по ссылке
 async function doc(ctx, next) {
 
-  const {_query, route, params, _auth} = ctx;
-  const ref = route.params.ref;
+  const {_query, params, _auth} = ctx;
+  const ref = (params.ref || '').toLowerCase();
   const {couch_local, zone} = $p.job_prm;
 
-  const data_mgr = $p.md.mgr_by_class_name(ctx.params.class);
+  const data_mgr = $p.md.mgr_by_class_name(params.class);
   const md = data_mgr.metadata();
   const res = {docs: []};
 
@@ -321,7 +322,7 @@ async function doc(ctx, next) {
       skip_setup: true
     });
 
-    const obj = await pouch.get(ctx.params.class + '|' + ref);
+    const obj = await pouch.get(params.class + '|' + ref);
     res.docs.push(obj);
   }
   else{

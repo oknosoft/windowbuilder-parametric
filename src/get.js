@@ -43,13 +43,13 @@ function serialize_prod({o, prod, ctx}) {
 // формирует json описания продукции заказа
 async function calc_order(ctx, next) {
 
-  const {ref} = ctx.params;
+  const ref = (ctx.params.ref || '').toLowerCase();
   const o = await $p.doc.calc_order.get(ref, 'promise');
 
   if(o.is_new()){
     ctx.status = 404;
     ctx.body = {
-      ref: ref,
+      ref,
       production: [],
       error: true,
       message: `Заказ с идентификатором '${ref}' не существует`,
@@ -65,7 +65,8 @@ async function calc_order(ctx, next) {
 async function store(ctx, next) {
   // данные авторизации получаем из контекста
   const {_auth, params} = ctx;
-  const _id = `_local/store.${_auth.suffix}.${params.ref || 'mapping'}`;
+  const ref = (params.ref || '').toLowerCase();
+  const _id = `_local/store.${_auth.suffix}.${ref || 'mapping'}`;
   ctx.body = await $p.adapters.pouch.remote.doc.get(_id)
     .catch((err) => ({error: true, message: `Объект ${_id} не найден\n${err.message}`}));
 }
@@ -73,7 +74,8 @@ async function store(ctx, next) {
 async function log(ctx, next) {
   // данные авторизации получаем из контекста
   const {_auth, params} = ctx;
-  const _id = `_local/log.${_auth.suffix}.${params.ref}`;
+  const ref = (params.ref || '').toLowerCase();
+  const _id = `_local/log.${_auth.suffix}.${ref}`;
   ctx.body = await $p.adapters.pouch.remote.doc.get(_id)
     .catch((err) => ({error: true, message: `Объект ${_id} не найден\n${err.message}`}));
 }
