@@ -2220,7 +2220,7 @@ $p.CatFurnsSpecificationRow = class CatFurnsSpecificationRow extends $p.CatFurns
 
 // подписываемся на событие после загрузки из pouchdb-ram и готовности предопределенных
 $p.md.once('predefined_elmnts_inited', () => {
-  $p.cat.scheme_settings.find_schemas('dp.buyers_order.production');
+  $p.cat.scheme_settings && $p.cat.scheme_settings.find_schemas('dp.buyers_order.production');
 });
 
 $p.cat.inserts.__define({

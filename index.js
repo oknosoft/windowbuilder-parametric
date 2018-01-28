@@ -211,13 +211,13 @@ function serialize_prod({ o, prod, ctx }) {
 // формирует json описания продукции заказа
 async function calc_order(ctx, next) {
 
-  const { ref } = ctx.params;
+  const ref = (ctx.params.ref || '').toLowerCase();
   const o = await $p.doc.calc_order.get(ref, 'promise');
 
   if (o.is_new()) {
     ctx.status = 404;
     ctx.body = {
-      ref: ref,
+      ref,
       production: [],
       error: true,
       message: `Заказ с идентификатором '${ref}' не существует`
@@ -232,14 +232,16 @@ async function calc_order(ctx, next) {
 async function store(ctx, next) {
   // данные авторизации получаем из контекста
   const { _auth, params } = ctx;
-  const _id = `_local/store.${_auth.suffix}.${params.ref || 'mapping'}`;
+  const ref = (params.ref || '').toLowerCase();
+  const _id = `_local/store.${_auth.suffix}.${ref || 'mapping'}`;
   ctx.body = await $p.adapters.pouch.remote.doc.get(_id).catch(err => ({ error: true, message: `Объект ${_id} не найден\n${err.message}` }));
 }
 
 async function log(ctx, next) {
   // данные авторизации получаем из контекста
   const { _auth, params } = ctx;
-  const _id = `_local/log.${_auth.suffix}.${params.ref}`;
+  const ref = (params.ref || '').toLowerCase();
+  const _id = `_local/log.${_auth.suffix}.${ref}`;
   ctx.body = await $p.adapters.pouch.remote.doc.get(_id).catch(err => ({ error: true, message: `Объект ${_id} не найден\n${err.message}` }));
 }
 
@@ -3190,7 +3192,7 @@ module.exports = function ($p) {
 
   // подписываемся на событие после загрузки из pouchdb-ram и готовности предопределенных
   $p.md.once('predefined_elmnts_inited', () => {
-    $p.cat.scheme_settings.find_schemas('dp.buyers_order.production');
+    $p.cat.scheme_settings && $p.cat.scheme_settings.find_schemas('dp.buyers_order.production');
   });
 
   $p.cat.inserts.__define({
@@ -8750,8 +8752,9 @@ debug('required');
 // формирует json описания продукции заказа
 async function calc_order(ctx, next) {
 
-  const { _query, route } = ctx;
-  const res = { ref: route.params.ref, production: [] };
+  const { _query, params } = ctx;
+  const ref = (params.ref || '').toLowerCase();
+  const res = { ref, production: [] };
   const { cat, doc, utils, job_prm } = $p;
   const { contracts, nom, inserts, clrs } = cat;
 
@@ -9031,11 +9034,11 @@ function representation(obj, md) {
 // возаращает конкретный документ по ссылке
 async function doc(ctx, next) {
 
-  const { _query, route, params, _auth } = ctx;
-  const ref = route.params.ref;
+  const { _query, params, _auth } = ctx;
+  const ref = (params.ref || '').toLowerCase();
   const { couch_local, zone } = $p.job_prm;
 
-  const data_mgr = $p.md.mgr_by_class_name(ctx.params.class);
+  const data_mgr = $p.md.mgr_by_class_name(params.class);
   const md = data_mgr.metadata();
   const res = { docs: [] };
 
@@ -9048,7 +9051,7 @@ async function doc(ctx, next) {
       skip_setup: true
     });
 
-    const obj = await pouch.get(ctx.params.class + '|' + ref);
+    const obj = await pouch.get(params.class + '|' + ref);
     res.docs.push(obj);
   } else {
     const obj = data_mgr.get(ref);
