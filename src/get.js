@@ -8,6 +8,7 @@ debug('required');
 function serialize_prod({o, prod, ctx}) {
   const flds = ['margin', 'price_internal', 'amount_internal', 'marginality', 'first_cost', 'discount', 'discount_percent',
     'discount_percent_internal', 'changed', 'ordn', 'characteristic', 'qty'];
+  // человекочитаемая информация в табчасть продукции
   for(let row of o._obj.production){
     const ox = $p.cat.characteristics.get(row.characteristic);
     const nom = $p.cat.nom.get(row.nom);
@@ -32,6 +33,22 @@ function serialize_prod({o, prod, ctx}) {
       ox.unload();
     }
   }
+  // человекочитаемая информация в табчасть допреквизитов
+  const {properties} = $p.job_prm;
+  o.extra_fields.forEach(({property, _obj}) => {
+    let finded;
+    for(const prop in properties){
+      if(properties[prop] === property) {
+        _obj.property_name = prop;
+        finded = true;
+        break;
+      }
+    }
+    if(!finded) {
+      _obj.property_name = property.name;
+    }
+  });
+  // тело ответа
   ctx.body = JSON.stringify(o);
   prod && prod.forEach((cx) => {
     if (!cx.empty() && !cx.is_new() && !cx.calc_order.empty()) {

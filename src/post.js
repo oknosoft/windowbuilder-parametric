@@ -66,10 +66,12 @@ async function calc_order(ctx, next) {
 
     // допреквизиты: бежим структуре входного параметра, если свойства нет в реквизитах, проверяем доп
     for(const fld in _query) {
-      if(!o._metadata(fld) && job_prm.properties[fld]){
+      if(o._metadata(fld)){
+        continue;
+      }
+      const property = job_prm.properties[fld];
+      if(property && !property.empty()){
         let finded;
-        const property = job_prm.properties[fld];
-        //const value = property.type.date_part && property.type.types.length == 1 ? new Date(_query[fld]) : _query[fld];
         o.extra_fields.find_rows({property}, (row) => {
           row.value = _query[fld];
           finded = true;

@@ -177,6 +177,7 @@ debug('required');
 
 function serialize_prod({ o, prod, ctx }) {
   const flds = ['margin', 'price_internal', 'amount_internal', 'marginality', 'first_cost', 'discount', 'discount_percent', 'discount_percent_internal', 'changed', 'ordn', 'characteristic', 'qty'];
+  // человекочитаемая информация в табчасть продукции
   for (let row of o._obj.production) {
     const ox = $p.cat.characteristics.get(row.characteristic);
     const nom = $p.cat.nom.get(row.nom);
@@ -200,6 +201,22 @@ function serialize_prod({ o, prod, ctx }) {
       ox.unload();
     }
   }
+  // человекочитаемая информация в табчасть допреквизитов
+  const { properties } = $p.job_prm;
+  o.extra_fields.forEach(({ property, _obj }) => {
+    let finded;
+    for (const prop in properties) {
+      if (properties[prop] === property) {
+        _obj.property_name = prop;
+        finded = true;
+        break;
+      }
+    }
+    if (!finded) {
+      _obj.property_name = property.name;
+    }
+  });
+  // тело ответа
   ctx.body = JSON.stringify(o);
   prod && prod.forEach(cx => {
     if (!cx.empty() && !cx.is_new() && !cx.calc_order.empty()) {
@@ -547,7 +564,8 @@ exports.default = function ($p) {
                   res[row.elm] = _mgr ? _mgr.get(row.value, false, false) : row.value;
                 });
                 return res;
-              })()
+              })(),
+              enumerable: true
             });
           } else if (row.list) {
 
@@ -562,7 +580,8 @@ exports.default = function ($p) {
                 } else {
                   return row.value;
                 }
-              })
+              }),
+              enumerable: true
             });
           } else {
 
@@ -572,7 +591,8 @@ exports.default = function ($p) {
 
             job_prm[parents[row.parent]].__define(row.synonym, {
               value: _mgr ? _mgr.get(row.value, false, false) : row.value,
-              configurable: true
+              configurable: true,
+              enumerable: true
             });
           }
         }
@@ -8807,10 +8827,12 @@ async function calc_order(ctx, next) {
 
     // допреквизиты: бежим структуре входного параметра, если свойства нет в реквизитах, проверяем доп
     for (const fld in _query) {
-      if (!o._metadata(fld) && job_prm.properties[fld]) {
+      if (o._metadata(fld)) {
+        continue;
+      }
+      const property = job_prm.properties[fld];
+      if (property && !property.empty()) {
         let finded;
-        const property = job_prm.properties[fld];
-        //const value = property.type.date_part && property.type.types.length == 1 ? new Date(_query[fld]) : _query[fld];
         o.extra_fields.find_rows({ property }, row => {
           row.value = _query[fld];
           finded = true;
