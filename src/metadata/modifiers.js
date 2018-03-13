@@ -158,6 +158,28 @@ module.exports = function($p) {
 })($p.enm.elm_types);
 
 /**
+ * Дополнительные методы перечисления Типы вставок
+ *
+ * Created by Evgeniy Malyarov on 22.02.2018.
+ *
+ * @module enm_inserts_types
+ */
+
+
+(function(_mgr){
+
+  /**
+   * ### Список групп, задействованных в CalcOrderAdditions
+   * - можно изменить состав и порядок
+   * - в теории, здесь же можно создать новые значения перечислений и добавить их в состав (эксперимент)
+   */
+  _mgr.additions_groups = [_mgr.Подоконник, _mgr.Водоотлив, _mgr.МоскитнаяСетка, _mgr.Откос, _mgr.Профиль, _mgr.Монтаж, _mgr.Доставка, _mgr.Набор];
+
+
+})($p.enm.inserts_types);
+
+
+/**
  * ### Модификаторы перечислений
  *
  * &copy; Evgeniy Malyarov http://www.oknosoft.ru 2014-2018
@@ -311,7 +333,12 @@ module.exports = function($p) {
 // при старте приложения, загружаем в ОЗУ обычные характеристики (без ссылок на заказы)
 $p.md.once('predefined_elmnts_inited', () => {
   const _mgr = $p.cat.characteristics;
-  _mgr.adapter.load_view(_mgr, 'doc/nom_characteristics')
+  _mgr.adapter.load_view(_mgr, 'linked', {
+    limit: 1000,
+    include_docs: true,
+    startkey: [$p.utils.blank.guid, 'cat.characteristics'],
+    endkey: [$p.utils.blank.guid, 'cat.characteristics\u0fff']
+  })
     // и корректируем метаданные формы спецификации с учетом ролей пользователя
     .then(() => {
     const {current_user} = $p;
@@ -386,7 +413,7 @@ $p.CatCharacteristics = class CatCharacteristics extends $p.CatCharacteristics {
    * Рассчитывает наименование продукции
    */
   prod_name(short) {
-    const {calc_order_row, calc_order, leading_product, sys, clr} = this;
+    const {calc_order_row, calc_order, leading_product, sys, clr, origin} = this;
     let name = '';
 
     if(calc_order_row) {
@@ -421,9 +448,12 @@ $p.CatCharacteristics = class CatCharacteristics extends $p.CatCharacteristics {
         name += ':' + leading_product.calc_order_row.row.pad();
       }
 
-      // добавляем название системы
+      // добавляем название системы или вставки
       if(!sys.empty()) {
         name += '/' + sys.name;
+      }
+      else if(!origin.empty()) {
+        name += '/' + origin.name;
       }
 
       if(!short) {
@@ -592,6 +622,62 @@ $p.CatCharacteristics = class CatCharacteristics extends $p.CatCharacteristics {
 
     return this.owner;
   }
+
+  /**
+   * Дополнительные свойства изделия для рисовалки
+   */
+  get builder_props() {
+    const defaults = $p.CatCharacteristics.builder_props_defaults;
+    let props;
+    try {
+      props = JSON.parse(this._obj.builder_props || '{}');
+    }
+    catch(e) {
+      props = {};
+    }
+    for(const prop in defaults){
+      if(!props.hasOwnProperty(prop)) {
+        props[prop] = defaults[prop];
+      }
+    }
+    return props;
+  }
+  set builder_props(v) {
+    const {_obj, _data} = this;
+    if(this.empty()) {
+      return;
+    }
+    const name = 'builder_props';
+    if(_data && _data._loading) {
+      _obj[name] = v;
+      return;
+    }
+    let _modified;
+    if(typeof _obj[name] !== 'string'){
+      _obj[name] = JSON.stringify($p.CatCharacteristics.builder_props_defaults);
+      _modified = true;
+    }
+    const props = JSON.parse(_obj[name]);
+    for(const prop in v){
+      if(props[prop] !== v[prop]) {
+        props[prop] = v[prop];
+        _modified = true;
+      }
+    }
+    if(_modified) {
+      _obj[name] = JSON.stringify(props);
+      this.__notify(name);
+    }
+  }
+
+};
+
+$p.CatCharacteristics.builder_props_defaults = {
+  auto_lines: true,
+  custom_lines: true,
+  cnns: true,
+  visualization: true,
+  txts: true
 };
 
 // при изменении реквизита табчасти вставок
@@ -609,9 +695,6 @@ $p.CatCharacteristicsInsertsRow.prototype.value_change = function (field, type, 
     }
   }
 }
-
-
-
 
 // индивидуальная форма объекта характеристики
 $p.cat.characteristics.form_obj = function (pwnd, attr) {
@@ -648,7 +731,7 @@ $p.cat.characteristics.form_obj = function (pwnd, attr) {
   };
 
   return this.constructor.prototype.form_obj.call(this, pwnd, attr)
-    .then(function (res) {
+    .then((res) => {
       if(res) {
         o = res.o;
         wnd = res.wnd;
@@ -677,16 +760,16 @@ $p.cat.characteristics.form_obj = function (pwnd, attr) {
 	  constructor(_mgr) {
 
 	    this._obj = {
-        calc_order: $p.wsql.get_user_param("template_block_calc_order")
+        calc_order: $p.wsql.get_user_param('template_block_calc_order')
       }
 
       this._meta = Object.assign(_mgr.metadata()._clone(), {
         form: {
           selection: {
-            fields: ["presentation","svg"],
+            fields: ['presentation', 'svg'],
             cols: [
-              {"id": "presentation", "width": "320", "type": "ro", "align": "left", "sort": "na", "caption": "Наименование"},
-              {"id": "svg", "width": "*", "type": "rsvg", "align": "left", "sort": "na", "caption": "Эскиз"}
+              {id: 'presentation', width: '320', type: 'ro', align: 'left', sort: 'na', caption: 'Наименование'},
+              {id: 'svg', width: '*', type: 'rsvg', align: 'left', sort: 'na', caption: 'Эскиз'}
             ]
           }
         }
@@ -702,12 +785,12 @@ $p.cat.characteristics.form_obj = function (pwnd, attr) {
     get _manager() {
 	    return {
         value_mgr: $p.md.value_mgr,
-        class_name: "dp.fake"
+        class_name: 'dp.fake'
       }
     }
 
     get calc_order() {
-      return $p.CatCharacteristics.prototype._getter.call(this, "calc_order");
+      return $p.CatCharacteristics.prototype._getter.call(this, 'calc_order');
     }
     set calc_order(v) {
 
@@ -728,8 +811,8 @@ $p.cat.characteristics.form_obj = function (pwnd, attr) {
       }
 
       if(!$p.utils.is_empty_guid(_obj.calc_order) &&
-        $p.wsql.get_user_param("template_block_calc_order") != _obj.calc_order){
-        $p.wsql.set_user_param("template_block_calc_order", _obj.calc_order);
+        $p.wsql.get_user_param('template_block_calc_order') != _obj.calc_order) {
+        $p.wsql.set_user_param('template_block_calc_order', _obj.calc_order);
       }
     }
 
@@ -752,7 +835,7 @@ $p.cat.characteristics.form_obj = function (pwnd, attr) {
 		}
 
 		// начальное значение - выбранные в предыдущий раз типовой блок
-		attr.initial_value = $p.wsql.get_user_param("template_block_initial_value");
+    attr.initial_value = $p.wsql.get_user_param('template_block_initial_value');
 
 		// подсовываем типовой форме списка изменённые метаданные
 		attr.metadata = selection_block._meta;
@@ -763,35 +846,33 @@ $p.cat.characteristics.form_obj = function (pwnd, attr) {
 			let calc_order;
 
 			// получаем ссылку на расчет из отбора
-			attr.selection.some((o) => {
-				if(Object.keys(o).indexOf("calc_order") != -1){
-					calc_order = o.calc_order;
-					return true;
-				}
-			});
+      attr.selection.some((o) => {
+        if(Object.keys(o).indexOf('calc_order') != -1) {
+          calc_order = o.calc_order;
+          return true;
+        }
+      });
 
 			// получаем документ расчет
 			return $p.doc.calc_order.get(calc_order, true, true)
 				.then((o) => {
 
 					// получаем массив ссылок на характеристики в табчасти продукции
-					o.production.each((row) => {
-						if(!row.characteristic.empty()){
-							if(row.characteristic.is_new()){
-                crefs.push(row.characteristic.ref);
+					o.production.forEach(({characteristic}) => {
+						if(!characteristic.empty()){
+							if(characteristic.is_new()){
+                crefs.push(characteristic.ref);
               }
 							else{
 								// если это характеристика продукции - добавляем
-								if(!row.characteristic.calc_order.empty() && row.characteristic.coordinates.count()){
-									if(row.characteristic._attachments &&
-										row.characteristic._attachments.svg &&
-										!row.characteristic._attachments.svg.stub){
-                    ares.push(row.characteristic);
+                if(!characteristic.calc_order.empty() && characteristic.coordinates.count()) {
+                  if(characteristic.svg) {
+                    ares.push(characteristic);
                   }
-									else{
-                    crefs.push(row.characteristic.ref);
+                  else {
+                    crefs.push(characteristic.ref);
                   }
-								}
+                }
 							}
 						}
 					});
@@ -810,25 +891,15 @@ $p.cat.characteristics.form_obj = function (pwnd, attr) {
 					// фильтруем по подстроке
 					crefs.length = 0;
 					ares.forEach((o) => {
-            const presentation = ((o.calc_order_row && o.calc_order_row.note) || o.note || o.name) + "<br />" + o.owner.name;
+            const presentation = ((o.calc_order_row && o.calc_order_row.note) || o.note || o.name) + '<br />' + o.owner.name;
 						if(!attr.filter || presentation.toLowerCase().match(attr.filter.toLowerCase()))
 							crefs.push({
 								ref: o.ref,
                 presentation:   '<div style="white-space:normal"> ' + presentation + ' </div>',
-								svg: o._attachments ? o._attachments.svg : ""
+								svg: o.svg || ''
 							});
 					});
 
-					// догружаем изображения
-					ares.length = 0;
-					crefs.forEach((o) => {
-						if(o.svg && o.svg.data){
-							ares.push($p.utils.blob_as_text(o.svg.data)
-								.then(function (svg) {
-									o.svg = svg;
-								}))
-						}
-					});
 					return Promise.all(ares);
 
 				})
@@ -1068,29 +1139,35 @@ $p.cat.clrs.__define({
         // если указаны оба цвета
         if(btn_id=="btn_select" && !eclr.clr_in.empty() && !eclr.clr_out.empty()) {
 
-          // ищем в справочнике цветов
-          const ares = $p.wsql.alasql("select top 1 ref from ? where clr_in = ? and clr_out = ? and (not ref = ?)",
-            [$p.cat.clrs.alatable, eclr.clr_in.ref, eclr.clr_out.ref, $p.utils.blank.guid]);
-
-          // если не нашли - создаём
-          if(ares.length){
-            pwnd.on_select.call(pwnd, $p.cat.clrs.get(ares[0]));
+          // если цвета изнутри и снаружи одинаковы, возвращаем первый
+          if(eclr.clr_in == eclr.clr_out) {
+            pwnd.on_select.call(pwnd, eclr.clr_in);
           }
-          else{
-            $p.cat.clrs.create({
-              clr_in: eclr.clr_in,
-              clr_out: eclr.clr_out,
-              name: eclr.clr_in.name + " \\ " + eclr.clr_out.name,
-              parent: $p.job_prm.builder.composite_clr_folder
-            })
-            // регистрируем цвет в couchdb
-              .then((obj) => obj.register_on_server())
-              .then((obj) => pwnd.on_select.call(pwnd, obj))
-              .catch((err) => $p.msg.show_msg({
-                type: "alert-warning",
-                text: "Недостаточно прав для добавления составного цвета",
-                title: "Составной цвет"
-              }));
+          else {
+            // ищем в справочнике цветов
+            const ares = $p.wsql.alasql("select top 1 ref from cat_clrs where clr_in = ? and clr_out = ? and (not ref = ?)",
+              [eclr.clr_in.ref, eclr.clr_out.ref, $p.utils.blank.guid]);
+
+            // если не нашли - создаём
+            if(ares.length){
+              pwnd.on_select.call(pwnd, $p.cat.clrs.get(ares[0]));
+            }
+            else{
+              $p.cat.clrs.create({
+                clr_in: eclr.clr_in,
+                clr_out: eclr.clr_out,
+                name: eclr.clr_in.name + " \\ " + eclr.clr_out.name,
+                parent: $p.job_prm.builder.composite_clr_folder
+              })
+              // регистрируем цвет в couchdb
+                .then((obj) => obj.register_on_server())
+                .then((obj) => pwnd.on_select.call(pwnd, obj))
+                .catch((err) => $p.msg.show_msg({
+                  type: 'alert-warning',
+                  text: 'Недостаточно прав для добавления составного цвета',
+                  title: 'Составной цвет'
+                }));
+            }
           }
 
           wnd.close();
@@ -1156,39 +1233,44 @@ $p.cat.clrs.__define({
 					eclr.clr_in = $p.utils.blank.guid;
 					eclr.clr_out = $p.utils.blank.guid;
 
-					// Создаём элементы управления
-					const clr_in = new $p.iface.OCombo({
-						parent: tb_filter.div.obj,
-						obj: eclr,
-						field: "clr_in",
-						width: 150,
-						hide_frm: true,
-						get_option_list: get_option_list
-					});
-					const clr_out = new $p.iface.OCombo({
-						parent: tb_filter.div.obj,
-						obj: eclr,
-						field: "clr_out",
-						width: 150,
-						hide_frm: true,
-						get_option_list: get_option_list
-					});
+          // Создаём элементы управления
+          const clr_in = new $p.iface.OCombo({
+            parent: tb_filter.div.obj,
+            obj: eclr,
+            field: 'clr_in',
+            width: 160,
+            hide_frm: true,
+            get_option_list: get_option_list
+          });
+          const clr_out = new $p.iface.OCombo({
+            parent: tb_filter.div.obj,
+            obj: eclr,
+            field: 'clr_out',
+            width: 160,
+            hide_frm: true,
+            get_option_list: get_option_list
+          });
 
-					clr_in.DOMelem.style.float = "left";
-					clr_in.DOMelem_input.placeholder = "Цвет изнутри";
-					clr_out.DOMelem_input.placeholder = "Цвет снаружи";
+          const clr_in_title = document.createElement('DIV');
+          clr_in_title.innerHTML = 'Со стороны петель';
+          clr_in_title.style = 'position: absolute;top: -4px;padding-left: 2px;font-size: small;color: gray;';
+          tb_filter.div.obj.appendChild(clr_in_title);
 
-					clr_in.attachEvent("onChange", tb_filter.call_event);
-					clr_out.attachEvent("onChange", tb_filter.call_event);
-					clr_in.attachEvent("onClose", tb_filter.call_event);
-					clr_out.attachEvent("onClose", tb_filter.call_event);
+          clr_in.DOMelem.style.float = 'left';
+          clr_in.DOMelem_input.placeholder = 'Цвет изнутри';
+          clr_out.DOMelem_input.placeholder = 'Цвет снаружи';
 
-					// гасим кнопки управления
-          wnd.elmnts.toolbar.hideItem("btn_new");
-          wnd.elmnts.toolbar.hideItem("btn_edit");
-          wnd.elmnts.toolbar.hideItem("btn_delete");
+          clr_in.attachEvent('onChange', tb_filter.call_event);
+          clr_out.attachEvent('onChange', tb_filter.call_event);
+          clr_in.attachEvent('onClose', tb_filter.call_event);
+          clr_out.attachEvent('onClose', tb_filter.call_event);
 
-          wnd.elmnts.toolbar.setItemText("btn_select", "<b>Выбрать или создать</b>");
+          // гасим кнопки управления
+          wnd.elmnts.toolbar.hideItem('btn_new');
+          wnd.elmnts.toolbar.hideItem('btn_edit');
+          wnd.elmnts.toolbar.hideItem('btn_delete');
+
+          wnd.elmnts.toolbar.setItemText('btn_select', '<b>Выбрать или создать</b>');
 
 					return wnd;
 
@@ -1218,12 +1300,8 @@ $p.CatClrs = class CatClrs extends $p.CatClrs {
 
   // записывает элемент цвета на сервере
   register_on_server() {
-    return $p.wsql.pouch.save_obj(this, {
-      db: $p.wsql.pouch.remote.ram
-    })
-      .then(function (obj) {
-        return obj.save();
-      })
+    const {pouch} = $p.adapters;
+    return pouch.save_obj(this, {db: pouch.remote.ram});
   }
 
   // возвращает стороны, на которых цвет
@@ -1572,7 +1650,7 @@ Object.defineProperties($p.cat.divisions, {
     value: function (selection, val) {
       const list = [];
       $p.current_user.acl_objs.find_rows({type: "cat.divisions"}, ({acl_obj}) => {
-        if(list.indexOf(acl_obj) == -1){
+        if(acl_obj && list.indexOf(acl_obj) == -1){
           list.push(acl_obj);
           acl_obj._children().forEach((o) => list.indexOf(o) == -1 && list.push(o));
         }
@@ -2080,7 +2158,8 @@ $p.CatFurns = class CatFurns extends $p.CatFurns {
 
           // в зависимости от типа строки, добавляем саму строку или её подчиненную спецификацию
           if(dop_row.is_set_row){
-            dop_row.nom.get_spec(contour, cache).each((sub_row) => {
+            const {nom} = dop_row;
+            nom && nom.get_spec(contour, cache).each((sub_row) => {
               if(sub_row.is_procedure_row){
                 res.add(sub_row);
               }
@@ -2097,7 +2176,8 @@ $p.CatFurns = class CatFurns extends $p.CatFurns {
 
       // в зависимости от типа строки, добавляем саму строку или её подчиненную спецификацию
       if(row_furn.is_set_row){
-        row_furn.nom.get_spec(contour, cache, exclude_dop).each((sub_row) => {
+        const {nom} = row_furn;
+        nom && nom.get_spec(contour, cache, exclude_dop).each((sub_row) => {
           if(sub_row.is_procedure_row){
             res.add(sub_row);
           }
@@ -2173,8 +2253,9 @@ $p.CatFurnsSpecificationRow = class CatFurnsSpecificationRow extends $p.CatFurns
         }
         else {
           const elm = contour.profile_by_furn_side(row.side, cache);
-          len = elm._row.len - 2 * elm.nom.sizefurn;
+          len = elm ? (elm._row.len - 2 * elm.nom.sizefurn) : 0;
         }
+        len = len.round(0);
         if (len < row.lmin || len > row.lmax) {
           return res = false;
         }
@@ -2185,11 +2266,11 @@ $p.CatFurnsSpecificationRow = class CatFurnsSpecificationRow extends $p.CatFurns
   }
 
   get nom() {
-    return this._getter('nom')
+    return this._getter('nom') || this._getter('nom_set');
   }
-  set nom (v) {
-    if(v !== ""){
-      this._setter('nom', v)
+  set nom(v) {
+    if(v !== '') {
+      this._setter('nom', v);
     }
   }
 
@@ -2231,6 +2312,27 @@ $p.cat.inserts.__define({
 		]
 	},
 
+  /**
+   * возвращает возможные параметры вставок данного типа
+   */
+  _prms_by_type: {
+	  value: function (insert_type) {
+      const prms = new Set();
+      this.find_rows({available: true, insert_type}, (inset) => {
+        inset.used_params.forEach((param) => {
+          !param.is_calculated && prms.add(param);
+        });
+        inset.specification.forEach(({nom}) => {
+          const {used_params} = nom;
+          used_params && used_params.forEach((param) => {
+            !param.is_calculated && prms.add(param);
+          });
+        });
+      });
+      return prms;
+    }
+  },
+
   ItemData: {
     value: class ItemData {
       constructor(item, Renderer) {
@@ -2240,23 +2342,61 @@ $p.cat.inserts.__define({
 
         // индивидуальные классы строк
         class ItemRow extends $p.DpBuyers_orderProductionRow {
+
+          // корректирует метаданные полей свойств через связи параметров выбора
+          tune(ref, mf, column) {
+
+            const {inset} = this;
+            const prm = $p.cch.properties.get(ref);
+
+            // удаляем все связи, кроме владельца
+            if(mf.choice_params) {
+              const adel = new Set();
+              for(const choice of mf.choice_params) {
+                if(choice.name !== 'owner' && choice.path != prm) {
+                  adel.add(choice);
+                }
+              }
+              for(const choice of adel) {
+                mf.choice_params.splice(mf.choice_params.indexOf(choice), 1);
+              }
+            }
+
+            // если параметр не используется в текущей вставке, делаем ячейку readonly
+            const prms = new Set();
+            inset.used_params.forEach((param) => {
+              !param.is_calculated && prms.add(param);
+            });
+            inset.specification.forEach(({nom}) => {
+              const {used_params} = nom;
+              used_params && used_params.forEach((param) => {
+                !param.is_calculated && prms.add(param);
+              });
+            });
+            mf.read_only = !prms.has(prm);
+
+            // находим связи параметров
+            const links = prm.params_links({grid: {selection: {}}, obj: this});
+            const hide = links.some((link) => link.hide);
+            if(hide && !mf.read_only) {
+              mf.read_only = true;
+            }
+
+            // проверим вхождение значения в доступные и при необходимости изменим
+            if(links.length) {
+              // TODO: подумать про установку умолчаний
+              //prm.linked_values(links, this);
+              const filter = {}
+              prm.filter_params_links(filter, null, links);
+              filter.ref && mf.choice_params.push({
+                name: 'ref',
+                path: filter.ref,
+              });
+            }
+          }
         }
 
         this.ProductionRow = ItemRow;
-
-        // получаем возможные параметры вставок данного типа
-        const prms = new Set();
-        $p.cat.inserts.find_rows({available: true, insert_type: item}, (inset) => {
-          inset.used_params.forEach((param) => {
-            !param.is_calculated && prms.add(param);
-          });
-          inset.specification.forEach(({nom}) => {
-            const {used_params} = nom;
-            used_params && used_params.forEach((param) => {
-              !param.is_calculated && prms.add(param);
-            });
-          });
-        });
 
         // индивидуальные метаданные строк
         const meta = $p.dp.buyers_order.metadata('production');
@@ -2267,7 +2407,8 @@ $p.cat.inserts.__define({
 
         const changed = new Set();
 
-        for (const param of prms) {
+        // получаем возможные параметры вставок данного типа
+        for (const param of $p.cat.inserts._prms_by_type(item)) {
 
           // корректируем схему
           $p.cat.scheme_settings.find_rows({obj: 'dp.buyers_order.production', name: item.name}, (scheme) => {
@@ -2310,10 +2451,21 @@ $p.cat.inserts.__define({
         }
 
         for(const scheme of changed) {
-          scheme.save();
+          const {doc} = $p.adapters.pouch.local;
+          if(doc.adapter === 'http' && !scheme.user) {
+            doc.getSession().then(({userCtx}) => {
+              if(userCtx.roles.indexOf('doc_full') !== -1) {
+                scheme.save();
+              }
+            })
+          }
+          else {
+            scheme.save();
+          }
         }
 
       }
+
     }
   },
 
@@ -2720,18 +2872,24 @@ $p.CatInserts = class CatInserts extends $p.CatInserts {
             if(this.check_restrictions(row_ins_spec, row_prm, true)){
               row_spec = new_spec_row({elm, row_base: row_ins_spec, origin, spec, ox});
               // при расчете по периметру, выполняем формулу для каждого ребра периметра
-              if(!row_ins_spec.formula.empty()){
-                const qty = row_ins_spec.formula.execute({
-                  ox: ox,
-                  elm: rib.profile || rib,
-                  cnstr: len_angl && len_angl.cnstr || 0,
-                  inset: (len_angl && len_angl.hasOwnProperty('cnstr')) ? len_angl.origin : $p.utils.blank.guid,
-                  row_ins: row_ins_spec,
-                  row_spec: row_spec,
-                  len: rib.len
-                });
+              const qty = !row_ins_spec.formula.empty() && row_ins_spec.formula.execute({
+                ox: ox,
+                elm: rib.profile || rib,
+                cnstr: len_angl && len_angl.cnstr || 0,
+                inset: (len_angl && len_angl.hasOwnProperty('cnstr')) ? len_angl.origin : $p.utils.blank.guid,
+                row_ins: row_ins_spec,
+                row_spec: row_spec,
+                len: rib.len
+              });
+              // если формула не вернула значение, устанавливаем qty_len стандартным способом
+              if(qty) {
+                if(!row_spec.qty) {
+                  row_spec.qty = qty;
+                }
               }
-              calc_qty_len(row_spec, row_ins_spec, rib.len);
+              else {
+                calc_qty_len(row_spec, row_ins_spec, rib.len);
+              }
               calc_count_area_mass(row_spec, spec, _row, row_ins_spec.angle_calc_method);
             }
             row_spec = null;
@@ -2830,8 +2988,10 @@ $p.CatInserts = class CatInserts extends $p.CatInserts {
         _data.thickness = nom.thickness;
       }
       else{
-        this.specification.forEach((row) => {
-          _data.thickness += row.nom.thickness;
+        this.specification.forEach(({nom}) => {
+          if(nom) {
+            _data.thickness += nom.thickness;
+          }
         });
       }
     }
@@ -3393,7 +3553,7 @@ $p.CatProduction_params.prototype.__define({
 
 
 /**
- * ### Модуль менеджера и документа Расчет-заказ
+ * ### Модуль объекта документа Расчет-заказ
  * Обрботчики событий after_create, after_load, before_save, after_save, value_change
  * Методы выполняются в контексте текущего объекта this = DocObj
  *
@@ -3401,78 +3561,6 @@ $p.CatProduction_params.prototype.__define({
  *
  * @module doc_calc_order
  */
-
-(function (_mgr) {
-
-  // переопределяем формирование списка выбора
-  _mgr.metadata().tabular_sections.production.fields.characteristic._option_list_local = true;
-
-  // переопределяем объекты назначения дополнительных реквизитов
-  _mgr._destinations_condition = {predefined_name: {in: ['Документ_Расчет', 'Документ_ЗаказПокупателя']}};
-
-  // индивидуальная строка поиска
-  _mgr.build_search = function (tmp, obj) {
-
-    const {number_internal, client_of_dealer, partner, note} = obj;
-
-    tmp.search = (obj.number_doc +
-      (number_internal ? ' ' + number_internal : '') +
-      (client_of_dealer ? ' ' + client_of_dealer : '') +
-      (partner.name ? ' ' + partner.name : '') +
-      (note ? ' ' + note : '')).toLowerCase();
-  };
-
-  // метод загрузки шаблонов
-  _mgr.load_templates = async function () {
-
-    if(!$p.job_prm.builder) {
-      $p.job_prm.builder = {};
-    }
-    if(!$p.job_prm.builder.base_block) {
-      $p.job_prm.builder.base_block = [];
-    }
-    if(!$p.job_prm.pricing) {
-      $p.job_prm.pricing = {};
-    }
-
-    // дополним base_block шаблонами из систем профилей
-    const {base_block} = $p.job_prm.builder;
-    $p.cat.production_params.forEach((o) => {
-      if(!o.is_folder) {
-        o.base_blocks.forEach((row) => {
-          if(base_block.indexOf(row.calc_order) == -1) {
-            base_block.push(row.calc_order);
-          }
-        });
-      }
-    });
-
-    // загрузим шаблоны пачками по 10 документов
-    const refs = [];
-    for (let o of base_block) {
-      refs.push(o.ref);
-      if(refs.length > 9) {
-        await _mgr.adapter.load_array(_mgr, refs);
-        refs.length = 0;
-      }
-    }
-    if(refs.length) {
-      await _mgr.adapter.load_array(_mgr, refs);
-    }
-
-    // загружаем характеристики из первых строк шаблонов - нужны для фильтра по системам
-    refs.length = 0;
-    base_block.forEach(({production}) => {
-      if(production.count()) {
-        refs.push(production.get(0).characteristic.ref);
-      }
-    });
-    return $p.cat.characteristics.adapter.load_array($p.cat.characteristics, refs);
-
-  };
-
-})($p.doc.calc_order);
-
 
 // свойства и методы объекта
 $p.DocCalc_order = class DocCalc_order extends $p.DocCalc_order {
@@ -3616,9 +3704,12 @@ $p.DocCalc_order = class DocCalc_order extends $p.DocCalc_order {
       _obj.state = 'draft';
     }
 
+    // номера изделий в характеристиках
+    const rows_saver = this.product_rows(true);
+
     // пометим на удаление неиспользуемые характеристики
     // этот кусок не влияет на возвращаемое before_save значение и выполняется асинхронно
-    this._manager.pouch_db.query('svgs', {startkey: [this.ref, 0], endkey: [this.ref, 10e9]})
+    const res = this._manager.pouch_db.query('linked', {startkey: [this.ref, 'cat.characteristics'], endkey: [this.ref, 'cat.characteristics\u0fff']})
       .then(({rows}) => {
         const deleted = [];
         for (const {id} of rows) {
@@ -3636,11 +3727,18 @@ $p.DocCalc_order = class DocCalc_order extends $p.DocCalc_order {
       })
       .catch((err) => null);
 
+    if(this._data.before_save_sync) {
+      return res
+        .then(() => rows_saver)
+        .then(() => this);
+    }
+
   }
 
   // при изменении реквизита
   value_change(field, type, value) {
     if(field == 'organization') {
+      this.organization = value;
       this.new_number_doc();
       if(this.contract.organization != value) {
         this.contract = $p.cat.contracts.by_partner_and_org(this.partner, value);
@@ -3652,6 +3750,12 @@ $p.DocCalc_order = class DocCalc_order extends $p.DocCalc_order {
     // если изменение инициировано человеком, дополним список изменённых полей
     this._manager.emit_add_fields(this, ['contract']);
 
+  }
+
+  // при удалении строки
+  after_del_row(name) {
+    name === 'production' && this.product_rows();
+    return this;
   }
 
 
@@ -3685,11 +3789,36 @@ $p.DocCalc_order = class DocCalc_order extends $p.DocCalc_order {
   get contract() {
     return this._getter('contract');
   }
-
   set contract(v) {
     this._setter('contract', v);
     this.vat_consider = this.contract.vat_consider;
     this.vat_included = this.contract.vat_included;
+  }
+
+  /**
+   * Пересчитывает номера изделий в продукциях
+   * @param save
+   */
+  product_rows(save) {
+    const res = [];
+    this.production.forEach(({row, characteristic}) => {
+      if(!characteristic.empty() && characteristic.calc_order === this) {
+        if(characteristic.product !== row || characteristic.partner !== this.partner || characteristic._modified) {
+          characteristic.product = row;
+          if(!characteristic.owner.empty()) {
+            if(save) {
+              res.push(characteristic.save());
+            }
+            else {
+              characteristic.name = characteristic.prod_name();
+            }
+          }
+        }
+      }
+    });
+    if(save) {
+      return Promise.all(res);
+    }
   }
 
   /**
@@ -3703,23 +3832,22 @@ $p.DocCalc_order = class DocCalc_order extends $p.DocCalc_order {
       group: true,
       keys: []
     };
-    this.production.forEach(function (row) {
-      if(!row.characteristic.empty() && !row.nom.is_procedure && !row.nom.is_service && !row.nom.is_accessory) {
-        options.keys.push([row.characteristic.ref, '305e374b-3aa9-11e6-bf30-82cf9717e145', 1, 0]);
+    this.production.forEach(({nom, characteristic}) => {
+      if(!characteristic.empty() && !nom.is_procedure && !nom.is_service && !nom.is_accessory) {
+        options.keys.push([characteristic.ref, '305e374b-3aa9-11e6-bf30-82cf9717e145', 1, 0]);
       }
     });
-
-    return $p.wsql.pouch.remote.doc.query('server/dispatching', options)
-      .then(function (result) {
-        var res = {};
-        result.rows.forEach(function (row) {
-          if(row.value.plan) {
-            row.value.plan = moment(row.value.plan).format('L');
+    return $p.adapters.pouch.remote.doc.query('server/dispatching', options)
+      .then(function ({rows}) {
+        const res = {};
+        rows && rows.forEach(function ({key, value}) {
+          if(value.plan) {
+            value.plan = moment(value.plan).format('L');
           }
-          if(row.value.fact) {
-            row.value.fact = moment(row.value.fact).format('L');
+          if(value.fact) {
+            value.fact = moment(value.fact).format('L');
           }
-          res[row.key[0]] = row.value;
+          res[key[0]] = value;
         });
         return res;
       });
@@ -3748,9 +3876,6 @@ $p.DocCalc_order = class DocCalc_order extends $p.DocCalc_order {
       ДоговорНомер: contract.number_doc ? contract.number_doc : this.number_doc,
       ДоговорСрокДействия: moment(contract.validity).format('L'),
       ЗаказНомер: this.number_doc,
-      //Примечание (комментарий) к расчету  и внутренний номер расчет-заказа
-      Примечание: this.note,
-      НомерВнутренний: this.number_internal,
       Контрагент: partner.presentation,
       КонтрагентОписание: partner.long_presentation,
       КонтрагентДокумент: '',
@@ -3811,6 +3936,7 @@ $p.DocCalc_order = class DocCalc_order extends $p.DocCalc_order {
       ОрганизацияСвидетельствоНаименованиеОргана: organization.certificate_authority_name,
       ОрганизацияСвидетельствоСерияНомер: organization.certificate_series_number,
       ОрганизацияЮрФизЛицо: organization.individual_legal.presentation,
+      Офис: this.department.presentation,
       ПродукцияЭскизы: {},
       Проект: this.project.presentation,
       СистемыПрофилей: this.sys_profile,
@@ -3827,8 +3953,8 @@ $p.DocCalc_order = class DocCalc_order extends $p.DocCalc_order {
       СотрудникФамилия: individual_person.Фамилия,
       СотрудникФамилияРП: individual_person.ФамилияРП,
       СотрудникФИО: individual_person.Фамилия +
-      (individual_person.Имя ? ' ' + individual_person.Имя[1].toUpperCase() + '.' : '' ) +
-      (individual_person.Отчество ? ' ' + individual_person.Отчество[1].toUpperCase() + '.' : ''),
+      (individual_person.Имя ? ' ' + individual_person.Имя[0].toUpperCase() + '.' : '' ) +
+      (individual_person.Отчество ? ' ' + individual_person.Отчество[0].toUpperCase() + '.' : ''),
       СотрудникФИОРП: individual_person.ФамилияРП + ' ' + individual_person.ИмяРП + ' ' + individual_person.ОтчествоРП,
       СуммаДокумента: this.doc_amount.toFixed(2),
       СуммаДокументаПрописью: this.doc_amount.in_words(),
@@ -3873,55 +3999,65 @@ $p.DocCalc_order = class DocCalc_order extends $p.DocCalc_order {
       }
     }
 
-    // получаем эскизы продукций, параллельно накапливаем количество и площадь изделий
-    this.production.forEach((row) => {
-      if(!row.characteristic.empty() && !row.nom.is_procedure && !row.nom.is_service && !row.nom.is_accessory) {
+    return this.load_production().then(() => {
 
-        res.Продукция.push(this.row_description(row));
+      // получаем эскизы продукций, параллельно накапливаем количество и площадь изделий
+      this.production.forEach((row) => {
+        if(!row.characteristic.empty() && !row.nom.is_procedure && !row.nom.is_service && !row.nom.is_accessory) {
 
-        res.ВсегоИзделий += row.quantity;
-        res.ВсегоПлощадьИзделий += row.quantity * row.s;
+          res.Продукция.push(this.row_description(row));
 
-        // если запросили эскиз без размерных линий или с иными параметрами...
-        if(attr.sizes === false) {
+          res.ВсегоИзделий += row.quantity;
+          res.ВсегоПлощадьИзделий += row.quantity * row.s;
 
+          // если запросили эскиз без размерных линий или с иными параметрами...
+          if(attr.sizes === false) {
+
+          }
+          else {
+            if($p.job_prm.use_svgs) {
+              get_imgs.push(characteristics.get_attachment(row.characteristic.ref, 'svg')
+                .then(blob_as_text)
+                .then((svg_text) => res.ПродукцияЭскизы[row.characteristic.ref] = svg_text)
+                .catch((err) => err && err.status != 404 && $p.record_log(err))
+              );
+            }
+            else if(row.characteristic.svg) {
+              res.ПродукцияЭскизы[row.characteristic.ref] = row.characteristic.svg;
+            }
+          }
         }
-        else {
-          get_imgs.push(characteristics.get_attachment(row.characteristic.ref, 'svg')
-            .then(blob_as_text)
-            .then((svg_text) => res.ПродукцияЭскизы[row.characteristic.ref] = svg_text)
-            .catch((err) => err && err.status != 404 && $p.record_log(err))
-          );
+        else if(!row.nom.is_procedure && !row.nom.is_service && row.nom.is_accessory) {
+          res.Аксессуары.push(this.row_description(row));
         }
-      }
-      else if(!row.nom.is_procedure && !row.nom.is_service && row.nom.is_accessory) {
-        res.Аксессуары.push(this.row_description(row));
-      }
-      else if(!row.nom.is_procedure && row.nom.is_service && !row.nom.is_accessory) {
-        res.Услуги.push(this.row_description(row));
-      }
-    });
-    res.ВсегоПлощадьИзделий = res.ВсегоПлощадьИзделий.round(3);
-
-    return (get_imgs.length ? Promise.all(get_imgs) : Promise.resolve([]))
-      .then(() => $p.load_script('/dist/qrcodejs/qrcode.min.js', 'script'))
-      .then(() => {
-
-        const svg = document.createElement('SVG');
-        svg.innerHTML = '<g />';
-        const qrcode = new QRCode(svg, {
-          text: 'http://www.oknosoft.ru/zd/',
-          width: 100,
-          height: 100,
-          colorDark: '#000000',
-          colorLight: '#ffffff',
-          correctLevel: QRCode.CorrectLevel.H,
-          useSVG: true
-        });
-        res.qrcode = svg.innerHTML;
-
-        return res;
+        else if(!row.nom.is_procedure && row.nom.is_service && !row.nom.is_accessory) {
+          res.Услуги.push(this.row_description(row));
+        }
       });
+      res.ВсегоПлощадьИзделий = res.ВсегоПлощадьИзделий.round(3);
+
+      return (get_imgs.length ? Promise.all(get_imgs) : Promise.resolve([]))
+        .then(() => $p.load_script('/dist/qrcodejs/qrcode.min.js', 'script'))
+        .then(() => {
+
+          const svg = document.createElement('SVG');
+          svg.innerHTML = '<g />';
+          const qrcode = new QRCode(svg, {
+            text: 'http://www.oknosoft.ru/zd/',
+            width: 100,
+            height: 100,
+            colorDark: '#000000',
+            colorLight: '#ffffff',
+            correctLevel: QRCode.CorrectLevel.H,
+            useSVG: true
+          });
+          res.qrcode = svg.innerHTML;
+
+          return res;
+        });
+
+    });
+
   }
 
   /**
@@ -4091,7 +4227,7 @@ $p.DocCalc_order = class DocCalc_order extends $p.DocCalc_order {
     const prod = [];
     const {characteristics} = $p.cat;
     this.production.forEach(({nom, characteristic}) => {
-      if(!characteristic.empty() && (forse || characteristic.is_new()) && !nom.is_procedure && !nom.is_accessory) {
+      if(!characteristic.empty() && (forse || characteristic.is_new())) {
         prod.push(characteristic.ref);
       }
     });
@@ -4099,8 +4235,10 @@ $p.DocCalc_order = class DocCalc_order extends $p.DocCalc_order {
       .then(() => {
         prod.length = 0;
         this.production.forEach(({nom, characteristic}) => {
-          if(!characteristic.empty() && !nom.is_procedure && !nom.is_accessory) {
-            prod.push(characteristic);
+          if(!characteristic.empty()) {
+            if((!nom.is_procedure && !nom.is_accessory) || characteristic.specification.count() || characteristic.constructions.count() || characteristic.coordinates.count()){
+              prod.push(characteristic);
+            }
           }
         });
         return prod;
@@ -4182,10 +4320,7 @@ $p.DocCalc_order = class DocCalc_order extends $p.DocCalc_order {
       cx = Promise.resolve(ox);
       return false;
     }
-    if(row.characteristic.empty()){
-      mgr.find_rows({calc_order: this, product: row.row}, fill_cx);
-    }
-    else if(!row.characteristic._deleted){
+    if(!row.characteristic.empty() && !row.characteristic._deleted){
       fill_cx(row.characteristic);
     }
 
@@ -4586,8 +4721,8 @@ $p.doc.calc_order.form_list = function(pwnd, attr, handlers){
 			on_new: (o) => {
         handlers.handleNavigate(`/${this.class_name}/${o.ref}`);
 			},
-			on_edit: (_mgr, rId) => {
-        handlers.handleNavigate(`/${_mgr.class_name}/${rId}`);
+			on_edit: (_mgr, ref) => {
+        handlers.handleNavigate(`/${_mgr.class_name}/${ref}`);
 			}
 		};
 	}
@@ -4595,8 +4730,8 @@ $p.doc.calc_order.form_list = function(pwnd, attr, handlers){
   return this.pouch_db.getIndexes()
     .then(({indexes}) => {
       attr._index = {
-        ddoc: "mango_calc_order",
-        fields: ["department", "state", "date", "search"],
+        ddoc: 'mango_calc_order',
+        fields: ['department', 'state', 'date', 'search'],
         name: 'list',
         type: 'json',
       };
@@ -4614,7 +4749,7 @@ $p.doc.calc_order.form_list = function(pwnd, attr, handlers){
           wnd.dep_listener = (obj, fields) => {
             if(obj == dp && fields.department){
               elmnts.filter.call_event();
-              $p.wsql.set_user_param("current_department", dp.department.ref);
+              $p.wsql.set_user_param('current_department', dp.department.ref);
             }
           }
 
@@ -4622,6 +4757,7 @@ $p.doc.calc_order.form_list = function(pwnd, attr, handlers){
           if(handlers){
             const {custom_selection} = elmnts.filter;
             custom_selection._state = handlers.props.state_filter;
+            custom_selection.class_name = 'doc.calc_order';
             handlers.onProps = (props) => {
               if(custom_selection._state != props.state_filter){
                 custom_selection._state = props.state_filter;
@@ -4635,22 +4771,34 @@ $p.doc.calc_order.form_list = function(pwnd, attr, handlers){
 
           // добавляем отбор по подразделению
           const dp = $p.dp.builder_price.create();
-          const pos = elmnts.toolbar.getPosition("input_filter");
+          const pos = elmnts.toolbar.getPosition('input_filter');
+
+          // кнопка поиска по номеру
+          elmnts.toolbar.addButtonTwoState('by_number', pos, '<i class="fa fa-key fa-fw"></i>');
+          if($p.wsql.get_user_param('calc_order_by_number', 'boolean')) {
+            elmnts.toolbar.setItemState('by_number', true);
+          }
+          elmnts.toolbar.setItemToolTip('by_number', 'Режим поиска с учетом либо без учета статуса и подразделения');
+          elmnts.toolbar.attachEvent('onStateChange', (id, state) => {
+            $p.wsql.set_user_param('calc_order_by_number', state);
+            elmnts.filter.call_event();
+          });
+
           const txt_id = `txt_${dhx4.newId()}`;
-          elmnts.toolbar.addText(txt_id, pos, "");
+          elmnts.toolbar.addText(txt_id, pos, '');
           const txt_div = elmnts.toolbar.objPull[elmnts.toolbar.idPrefix + txt_id].obj;
           const dep = new $p.iface.OCombo({
             parent: txt_div,
             obj: dp,
-            field: "department",
+            field: 'department',
             width: 180,
             hide_frm: true,
           });
-          txt_div.style.border = "1px solid #ccc";
-          txt_div.style.borderRadius = "3px";
-          txt_div.style.padding = "3px 2px 1px 2px";
-          txt_div.style.margin = "1px 5px 1px 1px";
-          dep.DOMelem_input.placeholder = "Подразделение";
+          txt_div.style.border = '1px solid #ccc';
+          txt_div.style.borderRadius = '3px';
+          txt_div.style.padding = '3px 2px 1px 2px';
+          txt_div.style.margin = '1px 5px 1px 1px';
+          dep.DOMelem_input.placeholder = 'Подразделение';
 
           dp._manager.on('update', wnd.dep_listener);
 
@@ -4681,9 +4829,38 @@ $p.doc.calc_order.form_list = function(pwnd, attr, handlers){
                 return this._state == 'all' ? {$in: 'draft,sent,confirmed,declined,service,complaints,template,zarchive'.split(',')} : {$eq: this._state};
               },
               enumerable: true
-            }
+            },
+
+            // sort может зависеть от ...
+            _sort: {
+              get: function () {
+                if($p.wsql.get_user_param('calc_order_by_number', 'boolean')) {
+                  const flt = elmnts.filter.get_filter();
+                  if(flt.filter.length > 5) {
+                    return [{class_name: 'desc'}, {date: 'desc'}, {search: 'desc'}];
+                  }
+                }
+                return [{department: 'desc'}, {state: 'desc'}, {date: 'desc'}];
+              }
+            },
+
+            // индекс может зависеть от ...
+            _index: {
+              get: function () {
+                if($p.wsql.get_user_param('calc_order_by_number', 'boolean')) {
+                  const flt = elmnts.filter.get_filter();
+                  if(flt.filter.length > 5) {
+                    return {
+                      ddoc: 'mango',
+                      fields: ['class_name', 'date', 'search']
+                    };
+                  }
+                }
+                return attr._index;
+              }
+            },
+
           });
-          elmnts.filter.custom_selection._index = attr._index;
 
           // картинка заказа в статусбаре
           elmnts.status_bar = wnd.attachStatusBar();
@@ -4692,9 +4869,9 @@ $p.doc.calc_order.form_list = function(pwnd, attr, handlers){
               //dbl && $p.iface.set_hash("cat.characteristics", ref, "builder")
               dbl && handlers.handleNavigate(`/builder/${ref}`);
             });
-          elmnts.grid.attachEvent("onRowSelect", (rid) => elmnts.svgs.reload(rid));
+          elmnts.grid.attachEvent('onRowSelect', (rid) => elmnts.svgs.reload(rid));
 
-          wnd.attachEvent("onClose", (win) => {
+          wnd.attachEvent('onClose', (win) => {
             dep && dep.unload();
             return true;
           });
@@ -4718,8 +4895,40 @@ $p.doc.calc_order.form_list = function(pwnd, attr, handlers){
           //   this.frm_unload(on_create);
           // }
 
+
+          /**
+           * обработчик нажатия кнопок командных панелей
+           */
+          attr.toolbar_click = function toolbar_click(btn_id) {
+            switch (btn_id) {
+            case 'calc_order':
+              const ref = wnd.elmnts.grid.getSelectedRowId();
+              if(ref) {
+                const {calc_order} = $p.doc;
+                calc_order.clone(ref)
+                  .then((doc) => {
+                    handlers.handleNavigate(`/${calc_order.class_name}/${doc.ref}`);
+                  })
+                  .catch($p.record_log);
+                ;
+              }
+              else {
+                $p.msg.show_msg({
+                  type: 'alert-warning',
+                  text: $p.msg.no_selected_row.replace('%1', ''),
+                  title: $p.msg.main_title
+                });
+              }
+              break;
+            }
+          }
+
           resolve(wnd);
         }
+
+        attr.toolbar_struct = $p.injected_data['toolbar_calc_order_selection.xml'];
+
+
 
         return this.mango_selection(pwnd, attr);
 
@@ -4882,14 +5091,23 @@ $p.doc.calc_order.form_list = function(pwnd, attr, handlers){
         pwnd: wnd,
         read_only: wnd.elmnts.ro,
         oxml: {
-          ' ': [{id: 'number_doc', path: 'o.number_doc', synonym: 'Номер', type: 'ro', txt: o.number_doc},
+          ' ': [
+            {id: 'number_doc', path: 'o.number_doc', synonym: 'Номер', type: 'ro'},
             {id: 'date', path: 'o.date', synonym: 'Дата', type: 'ro', txt: moment(o.date).format(moment._masks.date_time)},
             'number_internal'
           ],
-          'Контактная информация': ['partner', 'client_of_dealer', 'phone',
-            {id: 'shipping_address', path: 'o.shipping_address', synonym: 'Адрес доставки', type: 'addr', txt: o['shipping_address']}
+          'Контактная информация': [
+            'partner',
+            {id: 'client_of_dealer', path: 'o.client_of_dealer', synonym: 'Клиент дилера', type: 'client'},
+            'phone',
+            {id: 'shipping_address', path: 'o.shipping_address', synonym: 'Адрес доставки', type: 'addr'}
           ],
-          'Дополнительные реквизиты': ['obj_delivery_state', 'category']
+          'Дополнительные реквизиты': [
+            'obj_delivery_state',
+            'category',
+            {id: 'manager', path: 'o.manager', synonym: 'Автор', type: 'ro'},
+            'leading_manager'
+          ]
         }
       });
 
@@ -4946,21 +5164,24 @@ $p.doc.calc_order.form_list = function(pwnd, attr, handlers){
           wnd = res.wnd;
           wnd.prompt = prompt;
           wnd.close_confirmed = true;
-          if(handlers){
+          if(handlers) {
             wnd.handleNavigate = handlers.handleNavigate;
             wnd.handleIfaceState = handlers.handleIfaceState;
           }
 
-          rsvg_reload();
-          o._manager.on('svgs', rsvg_reload);
+          o.load_production()
+            .then(() => {
+              rsvg_reload();
+              o._manager.on('svgs', rsvg_reload);
 
-          const search = $p.job_prm.parse_url_str(location.search);
-          if(search.ref) {
-            setTimeout(() => {
-              wnd.elmnts.tabs.tab_production && wnd.elmnts.tabs.tab_production.setActive();
-              rsvg_click(search.ref, 0);
-            }, 200);
-          };
+              const search = $p.job_prm.parse_url_str(location.search);
+              if(search.ref) {
+                setTimeout(() => {
+                  wnd.elmnts.tabs.tab_production && wnd.elmnts.tabs.tab_production.setActive();
+                  rsvg_click(search.ref, 0);
+                }, 200);
+              };
+            });
 
           return res;
         }
@@ -5103,6 +5324,10 @@ $p.doc.calc_order.form_list = function(pwnd, attr, handlers){
       case 'btn_go_connection':
         go_connection();
         break;
+
+      case 'calc_order':
+        clone_calc_order(o);
+        break;
       }
 
       if(btn_id.substr(0, 4) == 'prn_') {
@@ -5122,6 +5347,31 @@ $p.doc.calc_order.form_list = function(pwnd, attr, handlers){
      */
     function go_connection() {
       $p.msg.show_not_implemented();
+    }
+
+    /**
+     * копирует заказ
+     * @param o
+     * @return {undefined}
+     */
+    function clone_calc_order(o) {
+      const {_manager} = o;
+      if(o._modified) {
+        return $p.msg.show_msg({
+          title: o.presentation,
+          type: 'alert-warning',
+          text: 'Документ изменён.<br />Перед созданием копии сохраните заказ'
+        });
+      };
+      handlers.handleNavigate(`/login`);
+      _manager.clone(o)
+        .then((doc) => {
+          handlers.handleNavigate(`/${_manager.class_name}/${doc.ref}`);
+        })
+        .catch((err) => {
+          $p.record_log(err);
+          handlers.handleNavigate(`/`);
+        });
     }
 
     /**
@@ -5330,6 +5580,7 @@ $p.doc.calc_order.form_list = function(pwnd, attr, handlers){
       if(ro) {
         frm_toolbar.disableItem('btn_sent');
         frm_toolbar.disableItem('btn_save');
+        frm_toolbar.disableItem('btn_save_close');
         let toolbar;
         const disable = (itemId) => toolbar.disableItem(itemId);
         toolbar = tabs.tab_production.getAttachedToolbar();
@@ -5346,6 +5597,7 @@ $p.doc.calc_order.form_list = function(pwnd, attr, handlers){
           frm_toolbar.enableItem('btn_sent');
         }
         frm_toolbar.enableItem('btn_save');
+        frm_toolbar.enableItem('btn_save_close');
         let toolbar;
         const enable = (itemId) => toolbar.enableItem(itemId);
         toolbar = tabs.tab_production.getAttachedToolbar();
@@ -5397,7 +5649,7 @@ $p.doc.calc_order.form_list = function(pwnd, attr, handlers){
                 .then(({characteristic}) => {
                   // заполняем продукцию копией данных текущей строки
                   characteristic._mixin(row.characteristic._obj, null,
-                    ['ref', 'name', 'calc_order', 'product', 'leading_product', 'leading_elm', 'origin', 'note', 'partner'], true);
+                    'ref,name,calc_order,product,leading_product,leading_elm,origin,note,partner'.split(','), true);
                   handlers.handleNavigate(`/builder/${characteristic.ref}`);
                 });
             }
@@ -5520,6 +5772,207 @@ $p.doc.calc_order.form_selection = function(pwnd, attr){
 
 
 /**
+ * ### Модуль менеджера документа Расчет-заказ
+ * Обрботчики событий after_create, after_load, before_save, after_save, value_change
+ * Методы выполняются в контексте текущего объекта this = DocObj
+ *
+ * &copy; Evgeniy Malyarov http://www.oknosoft.ru 2014-2018
+ *
+ * @module doc_calc_order
+ */
+
+((_mgr) => {
+
+  // переопределяем формирование списка выбора
+  const {form, tabular_sections} = _mgr.metadata()
+  tabular_sections.production.fields.characteristic._option_list_local = true;
+
+  // структура дополнительных форм, связанных с реквизитами
+  // те же самые данные можно было разместить в meta_patch и пересобрать init.js
+  form.client_of_dealer = {
+    // описание полей по общим правилам метаданных
+    fields: {
+      surname: {
+        synonym: 'Фамилия',
+        mandatory: true,
+        type: {types: ['string'], str_len: 50}
+      },
+      name: {
+        synonym: 'Имя',
+        mandatory: true,
+        type: {types: ['string'], str_len: 50}
+      },
+      patronymic: {
+        synonym: 'Отчество',
+        type: {types: ['string'], str_len: 50}
+      },
+      passport_serial_number: {
+        synonym: 'Серия и номер паспорта',
+        tooltip: 'Серия и номер через пробел',
+        type: {types: ['string'], str_len: 20}
+      },
+      passport_date: {
+        synonym: 'Дата выдачи паспорта',
+        type: {types: ['date'], date_part: 'date'}
+      },
+      note: {
+        synonym: 'Дополнительно',
+        multiline_mode: true,
+        type: {types: ['string'], str_len: 0}
+      }
+    },
+    // форма объекта
+    obj: {
+      items: [
+        {
+          element: 'DataField',
+          fld: 'surname',
+        },
+        {
+          element: 'DataField',
+          fld: 'name',
+        },
+        {
+          element: 'DataField',
+          fld: 'patronymic',
+        },
+        {
+          element: 'DataField',
+          fld: 'passport_serial_number',
+        },
+        {
+          element: 'DataField',
+          fld: 'passport_date',
+        },
+        {
+          element: 'DataField',
+          fld: 'note',
+        },
+      ]
+    },
+    // форма выбора
+    selection: {
+      indexes: [
+        {
+          mango: false,
+          name: ''
+        }
+      ]
+    }
+  };
+
+  // переопределяем объекты назначения дополнительных реквизитов
+  _mgr._destinations_condition = {predefined_name: {in: ['Документ_Расчет', 'Документ_ЗаказПокупателя']}};
+
+  // индивидуальная строка поиска
+  _mgr.build_search = function (tmp, obj) {
+
+    const {number_internal, client_of_dealer, partner, note} = obj;
+
+    tmp.search = (obj.number_doc +
+      (number_internal ? ' ' + number_internal : '') +
+      (client_of_dealer ? ' ' + client_of_dealer : '') +
+      (partner.name ? ' ' + partner.name : '') +
+      (note ? ' ' + note : '')).toLowerCase();
+  };
+
+  // метод загрузки шаблонов
+  _mgr.load_templates = async function () {
+
+    if(!$p.job_prm.builder) {
+      $p.job_prm.builder = {};
+    }
+    if(!$p.job_prm.builder.base_block) {
+      $p.job_prm.builder.base_block = [];
+    }
+    if(!$p.job_prm.pricing) {
+      $p.job_prm.pricing = {};
+    }
+
+    // дополним base_block шаблонами из систем профилей
+    const {base_block} = $p.job_prm.builder;
+    $p.cat.production_params.forEach((o) => {
+      if(!o.is_folder) {
+        o.base_blocks.forEach((row) => {
+          if(base_block.indexOf(row.calc_order) == -1) {
+            base_block.push(row.calc_order);
+          }
+        });
+      }
+    });
+
+    // загрузим шаблоны пачками по 10 документов
+    const refs = [];
+    for (let o of base_block) {
+      refs.push(o.ref);
+      if(refs.length > 9) {
+        await _mgr.adapter.load_array(_mgr, refs);
+        refs.length = 0;
+      }
+    }
+    if(refs.length) {
+      await _mgr.adapter.load_array(_mgr, refs);
+    }
+
+    // загружаем характеристики из первых строк шаблонов - нужны для фильтра по системам
+    refs.length = 0;
+    base_block.forEach(({production}) => {
+      if(production.count()) {
+        refs.push(production.get(0).characteristic.ref);
+      }
+    });
+    return $p.cat.characteristics.adapter.load_array($p.cat.characteristics, refs);
+
+  };
+
+  // копирует заказ, возвращает промис с новым заказом
+  _mgr.clone = async function(src) {
+    if(typeof src === 'string') {
+      src = await _mgr.get(src, 'promise');
+    }
+    await src.load_production();
+    // создаём заказ
+    const {organization, partner, contract, ...others} = src._obj;
+    const dst = await _mgr.create({date: new Date(), organization, partner, contract});
+    dst._mixin(others, null, 'ref,date,number_doc,posted,_deleted,number_internal,production,planning,manager,obj_delivery_state'.split(','), true);
+    // заполняем продукцию и сохраненные эскизы
+    const map = new Map();
+    const aatt = [];
+    const db = _mgr.adapter.db(_mgr);
+    src.production.forEach((row) => {
+      const prow = Object.assign({}, row._obj);
+      if(row.characteristic.calc_order === src) {
+        const cx = prow.characteristic = $p.cat.characteristics.create({calc_order: dst.ref}, false, true);
+        cx._mixin(row.characteristic._obj, null, 'ref,name,calc_order,timestamp'.split(','), true);
+        cx._data._modified = true;
+        cx._data._is_new = true;
+        map.set(row.characteristic, cx);
+        if(row.characteristic._attachments) {
+          aatt.push(db.getAttachment(`cat.characteristics|${row.characteristic.ref}`, 'svg')
+            .then((att) => cx._obj._attachments = {svg: {content_type: 'image/svg+xml', data: att}})
+            .catch((err) => null));
+        }
+      }
+      dst.production.add(prow);
+    });
+
+    // дожидаемся вложений
+    await Promise.all(aatt);
+
+    // обновляем leading_product
+    dst.production.forEach((row) => {
+      const cx = map.get(row.ordn);
+      if(cx) {
+        row.ordn = row.characteristic.leading_product = cx;
+      }
+    });
+    dst._data.before_save_sync = true;
+    return dst.save();
+  }
+
+})($p.doc.calc_order);
+
+/**
  * ### Отчеты по документу Расчет
  *
  * &copy; Evgeniy Malyarov http://www.oknosoft.ru 2014-2018
@@ -5566,7 +6019,7 @@ $p.doc.calc_order.__define({
 				query_options.endkey = [$p.current_user.partners_uids[0],"\ufff0"];
 			}
 
-			return $p.wsql.pouch.remote.doc.query("server/invoice_execution", query_options)
+			return $p.adapters.pouch.remote.doc.query("server/invoice_execution", query_options)
 
 				.then(function (data) {
 
@@ -5629,14 +6082,14 @@ $p.doc.calc_order.__define({
 
 			var date_from = $p.utils.date_add_day(new Date(), -1, true),
 				date_till = $p.utils.date_add_day(date_from, 7, true),
-				query_options = {
-					reduce: true,
-					limit: 10000,
-					group: true,
-					group_level: 5,
-					startkey: [date_from.getFullYear(), date_from.getMonth()+1, date_from.getDate(), ""],
-					endkey: [date_till.getFullYear(), date_till.getMonth()+1, date_till.getDate(),"\ufff0"]
-				},
+        query_options = {
+          reduce: true,
+          limit: 10000,
+          group: true,
+          group_level: 5,
+          startkey: [date_from.getFullYear(), date_from.getMonth() + 1, date_from.getDate(), ''],
+          endkey: [date_till.getFullYear(), date_till.getMonth() + 1, date_till.getDate(), '\ufff0']
+        },
 				res = {
 					data: [],
 					readOnly: true,
@@ -5644,9 +6097,7 @@ $p.doc.calc_order.__define({
 					//minSpareRows: 1
 				};
 
-
-
-			return $p.wsql.pouch.remote.doc.query("server/planning", query_options)
+      return $p.adapters.pouch.remote.doc.query('server/planning', query_options)
 
 				.then(function (data) {
 
@@ -5876,7 +6327,12 @@ class Pricing {
     $p.md.once("predefined_elmnts_inited", () => {
 
       // грузим в ram цены номенклатуры
-      this.by_range()
+
+      // сначала, пытаемся из local
+      this.by_local()
+        .then((loc) => {
+          return !loc && this.by_range();
+        })
         .then(() => {
           // излучаем событие "можно открывать формы"
           $p.adapters.pouch.emit('pouch_complete_loaded');
@@ -5932,6 +6388,109 @@ class Pricing {
     }
   }
 
+  build_cache_local(prices) {
+
+    const {nom, currencies} = $p.cat;
+    const note = 'Индекс цен номенклатуры';
+    const date = new Date('2010-01-01');
+
+    for(const ref in prices) {
+      if(ref[0] === '_' || ref === 'remote_rev') {
+        continue;
+      }
+      const onom = nom.get(ref, false, true);
+      const value = prices[ref];
+
+      if (!onom || !onom._data){
+        $p.record_log({
+          class: 'error',
+          nom: ref,
+          note,
+          value
+        });
+        continue;
+      }
+      onom._data._price = value;
+
+      for(const cref in value){
+        for(const pref in value[cref]) {
+          const price = value[cref][pref][0];
+          price.date = date;
+          price.currency = currencies.get(price.currency);
+        }
+      }
+    }
+  }
+
+  // если оффлайн и есть доступ к серверу
+  sync_local(pouch, step = 0) {
+    return pouch.remote.doc.get(`_local/price_${step}`)
+      .then((remote) => {
+        return pouch.local.doc.get(`_local/price_${step}`)
+          .then((local) => local)
+          .catch(() => {})
+          .then((local) => {
+            // грузим цены из remote
+            this.build_cache_local(remote);
+
+            // если версия local отличается от remote - обновляем
+            if(local.remote_rev !== remote._rev) {
+              remote.remote_rev = remote._rev;
+              if(!local._rev) {
+                delete remote._rev;
+              }
+              else {
+                remote._rev = local._rev;
+              }
+              pouch.local.doc.put(remote);
+            }
+
+            return this.sync_local(pouch, ++step);
+          })
+      })
+      .catch((err) => {
+        if(step !== 0) {
+          pouch.local.doc.get(`_local/price_${step}`)
+            .then((local) => pouch.local.doc.remove(local))
+            .catch(() => null);
+          return true;
+        }
+      });
+  }
+
+  // из локальной базы или direct
+  by_local(step = 0) {
+    const {pouch} = $p.adapters;
+
+    // если мы в idb, но подключены к серверу, тянем цены оттуда
+    const pre = step === 0 && pouch.local.doc.adapter !== 'http' && $p.adapters.pouch.authorized ?
+      pouch.remote.doc.info()
+        .then(() => this.sync_local(pouch))
+        .catch((err) => null)
+      :
+      Promise.resolve();
+
+    return pre.then((loaded) => {
+      if(loaded) {
+        return loaded;
+      }
+      else {
+        return pouch.local.doc.get(`_local/price_${step}`)
+      }
+    })
+      .then((prices) => {
+        if(prices === true) {
+          return prices;
+        }
+        this.build_cache_local(prices);
+        pouch.emit('nom_prices', ++step);
+        return this.by_local(step);
+      })
+      .catch((err) => {
+        return step !== 0;
+      });
+  }
+
   /**
    * Перестраивает кеш цен номенклатуры по длинному ключу
    * @param startkey
@@ -5950,11 +6509,13 @@ class Pricing {
       })
       .then((res) => {
         this.build_cache(res.rows);
-        step++;
-        $p.adapters.pouch.emit('nom_prices', step);
+        $p.adapters.pouch.emit('nom_prices', ++step);
         if (res.rows.length === 600) {
           return this.by_range(res.rows[res.rows.length - 1].key, step);
         }
+      })
+      .catch((err) => {
+        $p.record_log(err);
       });
   }
 
@@ -6327,7 +6888,8 @@ class Pricing {
         "ireg.margin_coefficients"
       ];
 
-      $p.wsql.pouch.local.ram.replicate.to($p.wsql.pouch.remote.ram, {
+      const {pouch} = $p.adapters;
+      pouch.local.ram.replicate.to(pouch.remote.ram, {
         filter: (doc) => mgrs.indexOf(doc._id.split("|")[0]) != -1
       })
         .on('change', (info) => {
@@ -6392,8 +6954,8 @@ class Pricing {
         "cch.predefined_elmnts"
 
       ];
-
-      $p.wsql.pouch.local.ram.replicate.to($p.wsql.pouch.remote.ram, {
+      const {pouch} = $p.adapters;
+      pouch.local.ram.replicate.to(pouch.remote.ram, {
         filter: (doc) => mgrs.indexOf(doc._id.split("|")[0]) != -1
       })
         .on('change', (info) => {
@@ -6999,7 +7561,7 @@ class ProductsBuilding {
         };
 
         // добавляем спецификацию соединения рёбер заполнения с профилем
-        cnn_add_spec(curr.cnn, curr.profile, len_angl);
+        (len_angl.len > 3) && cnn_add_spec(curr.cnn, curr.profile, len_angl);
 
       }
 
@@ -7180,13 +7742,21 @@ class ProductsBuilding {
         // console.profile();
 
         // сохраняем картинку вместе с изделием
-        ox.save(undefined, undefined, {
-          svg: {
-            content_type: 'image/svg+xml',
-            data: new Blob([scheme.get_svg()], {type: 'image/svg+xml'})
-          }
-        })
-          .then(() => {
+        let saver;
+        if($p.job_prm.use_svgs) {
+          ox.save(undefined, undefined, {
+            svg: {
+              content_type: 'image/svg+xml',
+              data: new Blob([scheme.get_svg()], {type: 'image/svg+xml'})
+            }
+          });
+        }
+        else {
+          ox.svg = scheme.get_svg();
+          saver = ox.save();
+        }
+
+        saver.then(() => {
             $p.msg.show_msg([ox.name, 'Спецификация рассчитана']);
             delete scheme._attr._saving;
             ox.calc_order.characteristic_saved(scheme, attr);
@@ -7402,6 +7972,9 @@ class ProductsBuilding {
 
 }
 
+if(typeof global !== 'undefined'){
+  global.ProductsBuilding = ProductsBuilding;
+}
 $p.ProductsBuilding = ProductsBuilding;
 $p.products_building = new ProductsBuilding(true);
 
