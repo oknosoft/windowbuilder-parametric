@@ -1449,14 +1449,15 @@ module.exports = function ($p) {
   // при старте приложения, загружаем в ОЗУ обычные характеристики (без ссылок на заказы)
   $p.md.once('predefined_elmnts_inited', () => {
     const _mgr = $p.cat.characteristics;
+
+    // грузим характеристики
     _mgr.adapter.load_view(_mgr, 'linked', {
-      limit: 1000,
+      limit: 10000,
       include_docs: true,
       startkey: [$p.utils.blank.guid, 'cat.characteristics'],
       endkey: [$p.utils.blank.guid, 'cat.characteristics\u0fff']
-    })
-    // и корректируем метаданные формы спецификации с учетом ролей пользователя
-    .then(() => {
+    }).then(() => {
+      // и корректируем метаданные формы спецификации с учетом ролей пользователя
       const { current_user } = $p;
       if (current_user && (current_user.role_available('СогласованиеРасчетовЗаказов') || current_user.role_available('ИзменениеТехнологическойНСИ') || current_user.role_available('РедактированиеЦен'))) {
         return;
@@ -2807,35 +2808,6 @@ module.exports = function ($p) {
    * @module cat_formulas
    *
    */
-
-  // обработчик события после загрузки данных в озу
-  $p.adapters.pouch.once('pouch_data_loaded', () => {
-    // читаем элементы из pouchdb и создаём формулы
-    const { formulas } = $p.cat;
-    formulas.adapter.find_rows(formulas, { _top: 500, _skip: 0 }).then(rows => {
-      const parents = [formulas.predefined('printing_plates'), formulas.predefined('modifiers')];
-      const filtered = rows.filter(v => !v.disabled && parents.indexOf(v.parent) !== -1);
-      filtered.sort((a, b) => a.sorting_field - b.sorting_field).forEach(formula => {
-        // формируем списки печатных форм и внешних обработок
-        if (formula.parent == parents[0]) {
-          formula.params.find_rows({ param: 'destination' }, dest => {
-            const dmgr = $p.md.mgr_by_class_name(dest.value);
-            if (dmgr) {
-              if (!dmgr._printing_plates) {
-                dmgr._printing_plates = {};
-              }
-              dmgr._printing_plates[`prn_${formula.ref}`] = formula;
-            }
-          });
-        } else {
-          // выполняем модификаторы
-          try {
-            formula.execute();
-          } catch (err) {}
-        }
-      });
-    });
-  });
 
   $p.CatFormulas.prototype.__define({
 
@@ -5913,6 +5885,9 @@ module.exports = function ($p) {
             'Дополнительные реквизиты': ['obj_delivery_state', 'category', { id: 'manager', path: 'o.manager', synonym: 'Автор', type: 'ro' }, 'leading_manager']
           }
         });
+        wnd.elmnts.pg_left.xcell_action = function (component) {
+          $p.dp.buyers_order.open_component(wnd, o, handlers, component);
+        };
 
         /**
          *  правая колонка шапки документа
@@ -6088,7 +6063,7 @@ module.exports = function ($p) {
             break;
 
           case 'btn_additions':
-            $p.dp.buyers_order.open_additions(wnd, o, handlers);
+            $p.dp.buyers_order.open_component(wnd, o, handlers, 'CalcOrderAdditions');
             break;
 
           case 'btn_add_material':
