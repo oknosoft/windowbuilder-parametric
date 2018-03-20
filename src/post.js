@@ -129,6 +129,117 @@ async function array(ctx, next) {
   //ctx.body = res;
 }
 
+// перезаполняет даты и время партий доставки
+async function delivery(ctx, next) {
+
+  const {_query, _auth} = ctx;
+  if(!Array.isArray(_query)) {
+    ctx.status = 403;
+    ctx.body = {
+      error: true,
+      message: `Тело запроса должно содержать массив`,
+    };
+    return;
+  }
+  if(!_query.length) {
+    ctx.status = 403;
+    ctx.body = {
+      error: true,
+      message: `Пустой массив запроса`,
+    };
+    return;
+  }
+  if(_query.length > 50) {
+    ctx.status = 403;
+    ctx.body = {
+      error: true,
+      message: `За один запрос можно обработать не более 50 заказов`,
+    };
+    return;
+  }
+
+  try {
+    const {adapters: {pouch}, utils, job_prm} = $p;
+    const {delivery_order, delivery_date, delivery_time} = job_prm.properties;
+    const props = {delivery_order, delivery_date, delivery_time};
+    const orders = [];
+    const keys = _query.map((obj) => `doc.calc_order|${obj.ref}`);
+    const docs = await pouch.remote.doc.allDocs({keys, limit: keys.length, include_docs: true});
+
+    for(const {doc} of docs.rows) {
+      if(doc) {
+        let modified;
+        const ref = doc._id.substr(15);
+        const set = _query.reduce((sum, val) => {
+          if(sum) {
+            return sum;
+          }
+          if(val.ref === ref) {
+            return val;
+          }
+        }, null);
+
+        // обновляем табчасть extra_fields
+        if(!doc.extra_fields) {
+          doc.extra_fields = [];
+        }
+        doc.extra_fields.forEach((row) => {
+          if(row.Свойство) {
+            row.property = row.Свойство;
+            delete row.Свойство;
+          }
+          if(row.Значение) {
+            row.value = row.Значение;
+            delete row.Значение;
+          }
+        });
+        for(const name in set) {
+          const prop = props[`delivery_${name}`];
+          if(!prop) {
+            continue;
+          }
+          if(!doc.extra_fields.some((row) => {
+            if(row.property == prop) {
+              if(row.value !== set[name]) {
+                modified = true;
+                row.value = set[name];
+              }
+              return true;
+            }
+          })) {
+            doc.extra_fields.push({property: prop.ref, value: set[name]});
+          }
+        }
+
+        set.number_doc = doc.number_doc;
+
+        // если изменено, складываем для записи
+        if(modified) {
+          doc.timestamp = {
+            user: _auth.username,
+            moment: utils.moment().format('YYYY-MM-DDTHH:mm:ss ZZ'),
+          };
+          orders.push(doc);
+        }
+      }
+    }
+
+    // если есть, что записывать - записываем
+    if(orders.length) {
+      await pouch.remote.doc.bulkDocs(orders);
+    }
+
+    ctx.body = _query;
+
+  }
+  catch (err) {
+    ctx.status = 500;
+    ctx.body = err ? (err.stack || err.message) : `Ошибка при групповой установке дат доставки`;
+    debug(err);
+  }
+
+}
+
 // сохраняет объект в локальном хранилище отдела абонента
 async function store(ctx, next) {
 
@@ -351,6 +462,8 @@ module.exports = async (ctx, next) => {
         return await calc_order(ctx, next);
       case 'array':
         return await array(ctx, next);
+    case 'delivery':
+      return await delivery(ctx, next);
       case 'store':
         return await store(ctx, next);
       case 'docs':

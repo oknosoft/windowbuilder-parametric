@@ -21,9 +21,9 @@
     "koa": "^2.5.0",
     "koa-better-router": "^2.1",
     "md5-file": "^3.2.3",
-    "metadata-abstract-ui": "2.0.16-beta.53",
-    "metadata-core": "2.0.16-beta.53",
-    "metadata-pouchdb": "2.0.16-beta.53",
+    "metadata-abstract-ui": "2.0.16-beta.54",
+    "metadata-core": "2.0.16-beta.54",
+    "metadata-pouchdb": "2.0.16-beta.54",
     "request": "^2.85.0"
   },
   "devDependencies": {
