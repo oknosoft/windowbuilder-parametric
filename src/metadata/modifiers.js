@@ -29,42 +29,42 @@ module.exports = function($p) {
 	 */
 	Object.defineProperties(_mgr, {
 	  ad: {
-	    get: function () {
+	    get() {
         return this.УгловоеДиагональное;
       }
     },
     av: {
-      get: function () {
+      get() {
         return this.УгловоеКВертикальной;
       }
     },
     ah: {
-      get: function () {
+      get() {
         return this.УгловоеКГоризонтальной;
       }
     },
     t: {
-      get: function () {
+      get() {
         return this.ТОбразное;
       }
     },
     ii: {
-      get: function () {
+      get() {
         return this.Наложение;
       }
     },
     i: {
-      get: function () {
+      get() {
         return this.НезамкнутыйКонтур;
       }
     },
     xt: {
-      get: function () {
+      get() {
         return this.КрестПересечение;
       }
     },
     xx: {
-      get: function () {
+      get() {
         return this.КрестВСтык;
       }
     },
@@ -100,7 +100,7 @@ module.exports = function($p) {
 	_mgr.__define({
 
 		profiles: {
-			get : function(){
+			get(){
 				return cache.profiles
 					|| ( cache.profiles = [
 						_mgr.Рама,
@@ -111,7 +111,7 @@ module.exports = function($p) {
 		},
 
 		profile_items: {
-			get : function(){
+			get(){
 				return cache.profile_items
 					|| ( cache.profile_items = [
 						_mgr.Рама,
@@ -126,27 +126,27 @@ module.exports = function($p) {
 		},
 
 		rama_impost: {
-			get : function(){
+			get(){
 				return cache.rama_impost
 					|| ( cache.rama_impost = [ _mgr.Рама, _mgr.Импост] );
 			}
 		},
 
 		impost_lay: {
-			get : function(){
+			get(){
 				return cache.impost_lay
 					|| ( cache.impost_lay = [ _mgr.Импост, _mgr.Раскладка] );
 			}
 		},
 
 		stvs: {
-			get : function(){
+			get(){
 				return cache.stvs || ( cache.stvs = [_mgr.Створка] );
 			}
 		},
 
 		glasses: {
-			get : function(){
+			get(){
 				return cache.glasses
 					|| ( cache.glasses = [ _mgr.Стекло, _mgr.Заполнение] );
 			}
@@ -197,7 +197,7 @@ module.exports = function($p) {
 	$p.enm.open_types.__define({
 
 		is_opening: {
-			value: function (v) {
+			value(v) {
 
 				if(!v || v.empty() || v == this.Глухое || v == this.Неподвижное)
 					return false;
@@ -255,19 +255,19 @@ module.exports = function($p) {
 	$p.enm.orientations.__define({
 
 		hor: {
-			get: function () {
+			get() {
 				return this.Горизонтальная;
 			}
 		},
 
 		vert: {
-			get: function () {
+			get() {
 				return this.Вертикальная;
 			}
 		},
 
 		incline: {
-			get: function () {
+			get() {
 				return this.Наклонная;
 			}
 		}
@@ -279,37 +279,37 @@ module.exports = function($p) {
 	$p.enm.positions.__define({
 
 		left: {
-			get: function () {
+			get() {
 				return this.Лев;
 			}
 		},
 
 		right: {
-			get: function () {
+			get() {
 				return this.Прав;
 			}
 		},
 
 		top: {
-			get: function () {
+			get() {
 				return this.Верх;
 			}
 		},
 
 		bottom: {
-			get: function () {
+			get() {
 				return this.Низ;
 			}
 		},
 
 		hor: {
-			get: function () {
+			get() {
 				return this.ЦентрГоризонталь;
 			}
 		},
 
 		vert: {
-			get: function () {
+			get() {
 				return this.ЦентрВертикаль;
 			}
 		}
@@ -655,7 +655,7 @@ $p.CatCharacteristics = class CatCharacteristics extends $p.CatCharacteristics {
       return;
     }
     let _modified;
-    if(typeof _obj[name] !== 'string'){
+    if(!_obj[name] || typeof _obj[name] !== 'string'){
       _obj[name] = JSON.stringify($p.CatCharacteristics.builder_props_defaults);
       _modified = true;
     }
@@ -670,6 +670,120 @@ $p.CatCharacteristics = class CatCharacteristics extends $p.CatCharacteristics {
       _obj[name] = JSON.stringify(props);
       this.__notify(name);
     }
+  }
+
+  /**
+   * Пересчитывает изделие по тем же правилам, что и визуальная рисовалка
+   * @param attr
+   * @param editor
+   */
+  recalc(attr = {}, editor) {
+
+    // сначала, получаем объект заказа и продукции заказа в озу, т.к. пересчет изделия может приводить к пересчету соседних продукций
+
+    // загружаем изделие в редактор
+    const remove = !editor;
+    if(remove) {
+      editor = new $p.EditorInvisible();
+    }
+    const project = editor.create_scheme();
+    return project.load(this, true)
+      .then(() => {
+
+        // выполняем пересчет
+        project.save_coordinates({save: true, svg: false});
+
+      })
+      .then(() => {
+        project.ox = '';
+        if(remove) {
+          editor.unload();
+        }
+        else {
+          project.unload();
+        }
+        return this;
+      });
+
+  }
+
+  /**
+   * Рисует изделие или фрагмент изделия в Buffer в соответствии с параметрами attr
+   * @param attr
+   * @param editor
+   */
+  draw(attr = {}, editor) {
+
+    const ref = $p.utils.snake_ref(this.ref);
+    const res = attr.res || {};
+    res[ref] = {imgs: {}};
+
+    // загружаем изделие в редактор
+    const remove = !editor;
+    if(remove) {
+      editor = new $p.EditorInvisible();
+    }
+    const project = editor.create_scheme();
+    return project.load(this, true)
+      .then(() => {
+        const {_obj: {glasses, constructions, coordinates}} = this;
+        // формируем эскиз(ы) в соответствии с attr
+        if(attr.elm) {
+          project.draw_fragment({elm: attr.elm});
+          const num = attr.elm > 0 ? `g${attr.elm}` : `l${attr.elm}`;
+          if(attr.format === 'png') {
+            res[ref].imgs[num] = project.view.element.toDataURL('image/png').substr(22);
+          }
+          else {
+            res[ref].imgs[num] = project.get_svg(attr);
+          }
+        }
+        else if(attr.glasses) {
+          res[ref].glasses = glasses.map((glass) => Object.assign({}, glass));
+          res[ref].glasses.forEach((row) => {
+            const glass = project.draw_fragment({elm: row.elm});
+            // подтянем формулу стеклопакета
+            if(attr.format === 'png') {
+              res[ref].imgs[`g${row.elm}`] = project.view.element.toDataURL('image/png').substr(22);
+            }
+            else {
+              res[ref].imgs[`g${row.elm}`] = project.get_svg(attr);
+            }
+            if(glass){
+              row.formula_long = glass.formula(true);
+              glass.visible = false;
+            }
+          });
+          return res;
+        }
+        else {
+          if(attr.format === 'png') {
+            res[ref].imgs[`l0`] = project.view.element.toDataURL('image/png').substr(22);
+          }
+          else {
+            res[ref].imgs[`l0`] = project.get_svg(attr);
+          }
+          constructions.forEach(({cnstr}) => {
+            project.draw_fragment({elm: -cnstr});
+            if(attr.format === 'png') {
+              res[ref].imgs[`l${cnstr}`] = project.view.element.toDataURL('image/png').substr(22);
+            }
+            else {
+              res[ref].imgs[`l${cnstr}`] = project.get_svg(attr);
+            }
+          });
+        }
+      })
+      .then((res) => {
+        project.ox = '';
+        if(remove) {
+          editor.unload();
+        }
+        else {
+          project.unload();
+        }
+        return res;
+      });
   }
 
 };
@@ -997,7 +1111,7 @@ $p.cat.clrs.__define({
 	 * @return {*}
 	 */
   by_predefined: {
-    value: function (clr, clr_elm, clr_sch, elm, spec) {
+    value(clr, clr_elm, clr_sch, elm, spec) {
 
       const {predefined_name} = clr;
       if(predefined_name) {
@@ -1050,7 +1164,7 @@ $p.cat.clrs.__define({
    * @param clr {CatClrs} - исходный цвет
    */
   inverted: {
-    value: function(clr){
+    value(clr){
       if(clr.clr_in == clr.clr_out || clr.clr_in.empty() || clr.clr_out.empty()){
         return clr;
       }
@@ -1066,7 +1180,7 @@ $p.cat.clrs.__define({
 	 * @param mf {Object} - описание метаданных поля
 	 */
 	selection_exclude_service: {
-		value: function (mf, sys) {
+		value(mf, sys) {
 
 			if(mf.choice_params)
 				mf.choice_params.length = 0;
@@ -1130,7 +1244,7 @@ $p.cat.clrs.__define({
 	 * Форма выбора с фильтром по двум цветам, создающая при необходимости составной цвет
 	 */
 	form_selection: {
-		value: function (pwnd, attr) {
+		value(pwnd, attr) {
 
 		  const eclr = this.get();
 
@@ -1205,7 +1319,7 @@ $p.cat.clrs.__define({
 
 					tb_filter.__define({
 						get_filter: {
-							value: () => {
+							value() {
 								const res = {
 									selection: []
 								};
@@ -1284,7 +1398,7 @@ $p.cat.clrs.__define({
 	 * Изменяем алгоритм построения формы списка. Игнорируем иерархию, если указаны цвета изнутри или снаружи
 	 */
 	sync_grid: {
-		value: function(attr, grid) {
+		value(attr, grid) {
 
 			if(attr.action == "get_selection" && attr.selection && attr.selection.some(function (v) {
 				return v.hasOwnProperty("clr_in") || v.hasOwnProperty("clr_out");
@@ -1343,7 +1457,7 @@ $p.cat.cnns.__define({
   },
 
   sql_selection_list_flds: {
-    value: function(initial_value){
+    value(initial_value){
       return "SELECT _t_.ref, _t_.`_deleted`, _t_.is_folder, _t_.id, _t_.name as presentation, _k_.synonym as cnn_type," +
         " case when _t_.ref = '" + initial_value + "' then 0 else 1 end as is_initial_value FROM cat_cnns AS _t_" +
         " left outer join enm_cnn_types as _k_ on _k_.ref = _t_.cnn_type %3 %4 LIMIT 300";
@@ -1361,7 +1475,7 @@ $p.cat.cnns.__define({
    * @return {Array}
    */
   nom_cnn: {
-    value: function(nom1, nom2, cnn_types, ign_side, is_outer){
+    value(nom1, nom2, cnn_types, ign_side, is_outer){
 
       const {ProfileItem, BuilderElement, Filling} = $p.Editor;
       const {Вертикальная} = $p.enm.orientations
@@ -1395,7 +1509,7 @@ $p.cat.cnns.__define({
         }
       }
 
-      const ref1 = nom1.ref;
+      const ref1 = nom1.ref; // ref у BuilderElement равен ref номенклатуры или ref вставки
       const ref2 = onom2.ref;
 
       if(!is_i){
@@ -1470,7 +1584,7 @@ $p.cat.cnns.__define({
    * @param [is_outer] {Boolean}
    */
   elm_cnn: {
-    value: function(elm1, elm2, cnn_types, curr_cnn, ign_side, is_outer){
+    value(elm1, elm2, cnn_types, curr_cnn, ign_side, is_outer){
 
       // если установленное ранее соединение проходит по типу и стороне, нового не ищем
       if(curr_cnn && cnn_types && (cnn_types.indexOf(curr_cnn.cnn_type) != -1) && (cnn_types != $p.enm.cnn_types.acn.ii)){
@@ -1544,7 +1658,7 @@ $p.CatCnns.prototype.__define({
 	 * Возвращает основную строку спецификации соединения между элементами
 	 */
 	main_row: {
-		value: function (elm) {
+		value(elm) {
 
 			var ares, nom = elm.nom;
 
@@ -1580,7 +1694,7 @@ $p.CatCnns.prototype.__define({
 	 * Проверяет, есть ли nom в колонке nom2 соединяемых элементов
 	 */
 	check_nom2: {
-		value: function (nom) {
+		value(nom) {
 			var ref = $p.utils.is_data_obj(nom) ? nom.ref : nom;
 			return this.cnn_elmnts._obj.some(function (row) {
 				return row.nom == ref;
@@ -1603,7 +1717,7 @@ $p.CatCnns.prototype.__define({
 $p.cat.contracts.__define({
 
 	sql_selection_list_flds: {
-		value: function(initial_value){
+		value(initial_value){
 			return "SELECT _t_.ref, _t_.`_deleted`, _t_.is_folder, _t_.id, _t_.name as presentation, _k_.synonym as contract_kind, _m_.synonym as mutual_settlements, _o_.name as organization, _p_.name as partner," +
 				" case when _t_.ref = '" + initial_value + "' then 0 else 1 end as is_initial_value FROM cat_contracts AS _t_" +
 				" left outer join cat_organizations as _o_ on _o_.ref = _t_.organization" +
@@ -1614,7 +1728,7 @@ $p.cat.contracts.__define({
 	},
 
 	by_partner_and_org: {
-    value: function (partner, organization, contract_kind = $p.enm.contract_kinds.СПокупателем) {
+    value(partner, organization, contract_kind = $p.enm.contract_kinds.СПокупателем) {
 
       const {main_contract} = $p.cat.partners.get(partner);
 
@@ -1649,7 +1763,7 @@ $p.cat.contracts.__define({
 
 Object.defineProperties($p.cat.divisions, {
   get_option_list: {
-    value: function (selection, val) {
+    value(selection, val) {
       const list = [];
       $p.current_user.acl_objs.find_rows({type: "cat.divisions"}, ({acl_obj}) => {
         if(acl_obj && list.indexOf(acl_obj) == -1){
@@ -1697,7 +1811,7 @@ Object.defineProperties($p.cat.divisions, {
 $p.CatElm_visualization.prototype.__define({
 
 	draw: {
-		value: function (elm, layer, offset) {
+		value(elm, layer, offset) {
 
 		  const {CompoundPath, constructor} = elm.project._scope;
 
@@ -1791,7 +1905,7 @@ $p.CatElm_visualization.prototype.__define({
 $p.CatFormulas.prototype.__define({
 
 	execute: {
-		value: function (obj, attr) {
+		value(obj, attr) {
 
 			// создаём функцию из текста формулы
 			if(!this._data._formula && this.formula){
@@ -1838,7 +1952,7 @@ $p.CatFormulas.prototype.__define({
 	},
 
 	_template: {
-		get: function () {
+		get() {
 			if(!this._data._template){
         this._data._template = new $p.SpreadsheetDocument(this.template);
       }
@@ -1862,7 +1976,7 @@ $p.CatFormulas.prototype.__define({
 Object.defineProperties($p.cat.furns, {
 
   sql_selection_list_flds: {
-    value: function(initial_value){
+    value(initial_value){
       return "SELECT _t_.ref, _t_.`_deleted`, _t_.is_folder, _t_.parent, case when _t_.is_folder then '' else _t_.id end as id, _t_.name as presentation, _k_.synonym as open_type, \
 					 case when _t_.ref = '" + initial_value + "' then 0 else 1 end as is_initial_value FROM cat_furns AS _t_ \
 					 left outer join enm_open_types as _k_ on _k_.ref = _t_.open_type %3 %4 LIMIT 300";
@@ -1870,7 +1984,7 @@ Object.defineProperties($p.cat.furns, {
   },
 
   get_option_list: {
-    value: function (selection, val) {
+    value(selection, val) {
 
       const {characteristic, sys} = paper.project._dp;
       const {furn} = $p.job_prm.properties;
@@ -2284,17 +2398,19 @@ $p.cat.inserts.__define({
    * возвращает возможные параметры вставок данного типа
    */
   _prms_by_type: {
-	  value: function (insert_type) {
+	  value(insert_type) {
       const prms = new Set();
       this.find_rows({available: true, insert_type}, (inset) => {
         inset.used_params.forEach((param) => {
           !param.is_calculated && prms.add(param);
         });
         inset.specification.forEach(({nom}) => {
-          const {used_params} = nom;
-          used_params && used_params.forEach((param) => {
-            !param.is_calculated && prms.add(param);
-          });
+          if(nom){
+            const {used_params} = nom;
+            used_params && used_params.forEach((param) => {
+              !param.is_calculated && prms.add(param);
+            });
+          }
         });
       });
       return prms;
@@ -2336,10 +2452,12 @@ $p.cat.inserts.__define({
               !param.is_calculated && prms.add(param);
             });
             inset.specification.forEach(({nom}) => {
-              const {used_params} = nom;
-              used_params && used_params.forEach((param) => {
-                !param.is_calculated && prms.add(param);
-              });
+              if(nom){
+                const {used_params} = nom;
+                used_params && used_params.forEach((param) => {
+                  !param.is_calculated && prms.add(param);
+                });
+              }
             });
             mf.read_only = !prms.has(prm);
 
@@ -2405,12 +2523,12 @@ $p.cat.inserts.__define({
 
           // корректируем класс строки
           Object.defineProperty(ItemRow.prototype, param.ref, {
-            get: function () {
+            get() {
               const {product_params} = this._owner._owner;
               const row = product_params.find({elm: this.row, param}) || product_params.add({elm: this.row, param});
               return row.value;
             },
-            set: function (v) {
+            set(v) {
               const {product_params} = this._owner._owner;
               const row = product_params.find({elm: this.row, param}) || product_params.add({elm: this.row, param});
               row.value = v;
@@ -2438,7 +2556,7 @@ $p.cat.inserts.__define({
   },
 
 	by_thickness: {
-		value: function (min, max) {
+		value(min, max) {
 
 			if(!this._by_thickness){
 				this._by_thickness = {};
@@ -2462,7 +2580,7 @@ $p.cat.inserts.__define({
 	},
 
   sql_selection_list_flds: {
-	  value: function (initial_value) {
+	  value(initial_value) {
       return "SELECT _t_.ref, _t_.`_deleted`, _t_.is_folder, _t_.id, _t_.name as presentation, _k_.synonym as insert_type," +
         " case when _t_.ref = '" + initial_value + "' then 0 else 1 end as is_initial_value FROM cat_inserts AS _t_" +
         " left outer join enm_inserts_types as _k_ on _k_.ref = _t_.insert_type %3 %4 LIMIT 300";
@@ -2979,6 +3097,11 @@ $p.CatInserts = class CatInserts extends $p.CatInserts {
         res.push(param)
       }
     });
+    this.product_params.forEach(({param}) => {
+      if(!param.empty() && res.indexOf(param) == -1){
+        res.push(param)
+      }
+    });
     return res;
   }
 
@@ -2997,7 +3120,7 @@ $p.cat.insert_bind.__define({
    * Возвращает массив допвставок с привязками к изделию или слою
    */
   insets: {
-    value: function (ox) {
+    value(ox) {
       const {sys, owner} = ox;
       const res = [];
       this.forEach((o) => {
@@ -3031,7 +3154,7 @@ $p.cat.insert_bind.__define({
 $p.cat.nom.__define({
 
 	sql_selection_list_flds: {
-		value: function(initial_value){
+		value(initial_value){
 			return "SELECT _t_.ref, _t_.`_deleted`, _t_.is_folder, _t_.id, _t_.article, _t_.name as presentation, _u_.name as nom_unit, _k_.name as nom_kind, _t_.thickness," +
 				" case when _t_.ref = '" + initial_value + "' then 0 else 1 end as is_initial_value FROM cat_nom AS _t_" +
 				" left outer join cat_units as _u_ on _u_.ref = _t_.base_unit" +
@@ -3040,7 +3163,7 @@ $p.cat.nom.__define({
 	},
 
 	sql_selection_where_flds: {
-		value: function(filter){
+		value(filter){
 			return " OR _t_.article LIKE '" + filter + "' OR _t_.id LIKE '" + filter + "' OR _t_.name LIKE '" + filter + "'";
 		}
 	}
@@ -3056,7 +3179,7 @@ $p.CatNom.prototype.__define({
 	 * - с пересчетом из валюты в валюту
 	 */
 	_price: {
-		value: function (attr) {
+		value(attr) {
 
       let price = 0, currency, start_date = $p.utils.blank.date;
 
@@ -3180,7 +3303,7 @@ $p.CatNom.prototype.__define({
    * Возвращает значение допреквизита группировка
    */
   grouping: {
-	  get: function () {
+	  get() {
       if(!this.hasOwnProperty('_grouping')){
         this.extra_fields.find_rows({property: $p.job_prm.properties.grouping}, (row) => {
           this._grouping = row.value.name;
@@ -3197,10 +3320,10 @@ $p.CatNom.prototype.__define({
    * @type String
    */
   presentation: {
-    get : function(){
+    get(){
       return this.name + (this.article ? ' ' + this.article : '');
     },
-    set : function(v){
+    set(v){
     }
   },
 
@@ -3208,7 +3331,7 @@ $p.CatNom.prototype.__define({
    * Возвращает номенклатуру по ключу цветового аналога
    */
   by_clr_key: {
-    value: function (clr) {
+    value(clr) {
 
       if(this.clr == clr){
         return this;
@@ -3264,7 +3387,7 @@ $p.CatNom.prototype.__define({
 $p.cat.partners.__define({
 
 	sql_selection_where_flds: {
-		value: function(filter){
+		value(filter){
 			return " OR inn LIKE '" + filter + "' OR name_full LIKE '" + filter + "' OR name LIKE '" + filter + "'";
 		}
 	}
@@ -3273,7 +3396,7 @@ $p.cat.partners.__define({
 $p.CatPartners.prototype.__define({
 
 	addr: {
-		get: function () {
+		get() {
 
 			return this.contact_information._obj.reduce(function (val, row) {
 
@@ -3295,7 +3418,7 @@ $p.CatPartners.prototype.__define({
 	},
 
 	phone: {
-		get: function () {
+		get() {
 
 			return this.contact_information._obj.reduce(function (val, row) {
 
@@ -3314,23 +3437,22 @@ $p.CatPartners.prototype.__define({
 
 	// полное наименование с телефоном, адресом и банковским счетом
 	long_presentation: {
-		get: function () {
-			var res = this.name_full || this.name,
-				addr = this.addr,
-				phone = this.phone;
+		get() {
+		  const {addr, phone, inn, kpp} = this;
+			let res = this.name_full || this.name;
 
-			if(this.inn)
-				res+= ", ИНН" + this.inn;
-
-			if(this.kpp)
-				res+= ", КПП" + this.kpp;
-
-			if(addr)
-				res+= ", " + addr;
-
-			if(phone)
-				res+= ", " + phone;
-
+			if(inn){
+        res+= ", ИНН" + inn;
+      }
+			if(kpp){
+        res+= ", КПП" + kpp;
+      }
+			if(addr){
+        res+= ", " + addr;
+      }
+			if(phone){
+        res+= ", " + phone;
+      }
 			return res;
 		}
 	}
@@ -3388,7 +3510,7 @@ $p.CatProduction_params.prototype.__define({
 	 * @for Production_params
 	 */
 	noms: {
-		get: function(){
+		get(){
 			var __noms = [];
 			this.elmnts._obj.forEach(function(row){
 				if(!$p.utils.is_empty_guid(row.nom) && __noms.indexOf(row.nom) == -1)
@@ -3407,7 +3529,7 @@ $p.CatProduction_params.prototype.__define({
 	 * @return Array.<_cat.inserts>
 	 */
 	inserts: {
-		value: function(elm_types, by_default){
+		value(elm_types, by_default){
 			var __noms = [];
 			if(!elm_types)
 				elm_types = $p.enm.elm_types.rama_impost;
@@ -3458,7 +3580,7 @@ $p.CatProduction_params.prototype.__define({
 	 * @param cnstr {Nomber} - номер конструкции. Если 0 - перезаполняем параметры изделия, иначе - фурнитуры
 	 */
 	refill_prm: {
-		value: function (ox, cnstr = 0) {
+		value(ox, cnstr = 0) {
 
 			const prm_ts = !cnstr ? this.product_params : this.furn_params;
 			const adel = [];
@@ -3599,14 +3721,25 @@ $p.DocCalc_order = class DocCalc_order extends $p.DocCalc_order {
     // проверим заполненность подразделения
     if(this.obj_delivery_state == Шаблон) {
       this.department = $p.utils.blank.guid;
+      this.partner = $p.utils.blank.guid;
     }
-    else if(this.department.empty()) {
-      $p.msg.show_msg && $p.msg.show_msg({
-        type: 'alert-warning',
-        text: 'Не заполнен реквизит "офис продаж" (подразделение)',
-        title: this.presentation
-      });
-      return false;
+    else {
+      if(this.department.empty()) {
+        $p.msg.show_msg && $p.msg.show_msg({
+          type: 'alert-warning',
+          text: 'Не заполнен реквизит "офис продаж" (подразделение)',
+          title: this.presentation
+        });
+        return false;
+      }
+      if(this.partner.empty()) {
+        $p.msg.show_msg && $p.msg.show_msg({
+          type: 'alert-warning',
+          text: 'Не указан контрагент (дилер)',
+          title: this.presentation
+        });
+        return false;
+      }
     }
 
     this.production.forEach((row) => {
@@ -4400,6 +4533,108 @@ $p.DocCalc_order = class DocCalc_order extends $p.DocCalc_order {
   }
 
   /**
+   * Пересчитывает все изделия заказа по тем же правилам, что и визуальная рисовалка
+   * @param attr
+   * @param editor
+   */
+  recalc(attr = {}, editor) {
+
+    // при необходимости, создаём редактор
+    const remove = !editor;
+    if(remove) {
+      editor = new $p.EditorInvisible();
+    }
+    const project = editor.create_scheme();
+    let tmp = Promise.resolve();
+
+    // получаем массив продукций в озу
+    return this.load_production()
+      .then((prod) => {
+        // бежим по табчасти, если продукция, пересчитываем в рисовалке, если материал или paramrtric - пересчитываем строку
+        this.production.forEach((row) => {
+          const {characteristic} = row;
+          if(characteristic.empty() || characteristic.calc_order !== this) {
+            // это материал
+            row.value_change('quantity', '', row.quantity);
+          }
+          else if(characteristic.coordinates.count()) {
+            // это изделие рисовалки
+            tmp = tmp.then(() => {
+              return project.load(characteristic, true).then(() => {
+                // выполняем пересчет
+                project.save_coordinates({save: true, svg: false});
+              });
+            });
+          }
+          else if(characteristic.leading_product.calc_order === this) {
+            return;
+          }
+          else {
+            if(!characteristic.origin.empty() && !characteristic.origin.slave) {
+              // это paramrtric
+              characteristic.specification.clear();
+              const len_angl = new $p.DocCalc_order.FakeLenAngl({len: row.len, inset: characteristic.origin});
+              const elm = new $p.DocCalc_order.FakeElm(row);
+              characteristic.origin.calculate_spec({elm, len_angl, ox: characteristic});
+              tmp = tmp.then(() => {
+                return characteristic.save().then(() => {
+                  // выполняем пересчет
+                  row.value_change('quantity', '', row.quantity);
+                });
+              });
+            }
+            else {
+              row.value_change('quantity', '', row.quantity);
+            }
+          }
+        });
+        return tmp;
+      })
+      .then(() => {
+        project.ox = '';
+        if(remove) {
+          editor.unload();
+        }
+        else {
+          project.remove();
+        }
+        return this;
+      });
+
+  }
+
+  /**
+   * Рисует изделия или фрагмент изделий заказа в Buffer в соответствии с параметрами attr
+   * @param attr
+   * @param editor
+   */
+  draw(attr = {}, editor) {
+
+    // при необходимости, создаём редактор
+    const remove = !editor;
+    if(remove) {
+      editor = new $p.EditorInvisible();
+    }
+    const project = editor.create_scheme();
+
+    attr.res = {number_doc: this.number_doc};
+
+    let tmp = Promise.resolve();
+
+    // получаем массив продукций в озу
+    return this.load_production()
+      .then((prod) => {
+        for(let ox of prod){
+          if(ox.coordinates.count()) {
+            tmp = tmp.then(() => ox.draw(attr, editor));
+          }
+        }
+        return tmp;
+      });
+
+  }
+
+  /**
    * Устанавливает подразделение по умолчанию
    */
   static set_department() {
@@ -4731,6 +4966,14 @@ $p.doc.calc_order.form_list = function(pwnd, attr, handlers){
                 custom_selection._state = props.state_filter;
                 elmnts.filter.call_event();
               }
+              if(elmnts.toolbar) {
+                if(custom_selection._state === 'draft') {
+                  elmnts.toolbar.enableItem('btn_delete');
+                }
+                else {
+                  elmnts.toolbar.disableItem('btn_delete');
+                }
+              }
             }
 
             wnd.handleNavigate = handlers.handleNavigate;
@@ -4779,7 +5022,7 @@ $p.doc.calc_order.form_list = function(pwnd, attr, handlers){
           // настраиваем фильтр для списка заказов
           elmnts.filter.custom_selection.__define({
             department: {
-              get: function () {
+              get() {
                 const {department} = dp;
                 return this._state == 'template' ? {$eq: $p.utils.blank.guid} : {$eq: department.ref};
                 // const depts = [];
@@ -4793,7 +5036,7 @@ $p.doc.calc_order.form_list = function(pwnd, attr, handlers){
               enumerable: true
             },
             state: {
-              get: function(){
+              get(){
                 return this._state == 'all' ? {$in: 'draft,sent,confirmed,declined,service,complaints,template,zarchive'.split(',')} : {$eq: this._state};
               },
               enumerable: true
@@ -4801,7 +5044,7 @@ $p.doc.calc_order.form_list = function(pwnd, attr, handlers){
 
             // sort может зависеть от ...
             _sort: {
-              get: function () {
+              get() {
                 if($p.wsql.get_user_param('calc_order_by_number', 'boolean')) {
                   const flt = elmnts.filter.get_filter();
                   if(flt.filter.length > 5) {
@@ -4814,7 +5057,7 @@ $p.doc.calc_order.form_list = function(pwnd, attr, handlers){
 
             // индекс может зависеть от ...
             _index: {
-              get: function () {
+              get() {
                 if($p.wsql.get_user_param('calc_order_by_number', 'boolean')) {
                   const flt = elmnts.filter.get_filter();
                   if(flt.filter.length > 5) {
@@ -4869,6 +5112,7 @@ $p.doc.calc_order.form_list = function(pwnd, attr, handlers){
            */
           attr.toolbar_click = function toolbar_click(btn_id) {
             switch (btn_id) {
+
             case 'calc_order':
               const ref = wnd.elmnts.grid.getSelectedRowId();
               if(ref) {
@@ -4888,6 +5132,17 @@ $p.doc.calc_order.form_list = function(pwnd, attr, handlers){
                 });
               }
               break;
+
+            case 'btn_templates':
+            case 'btn_download':
+            case 'btn_share':
+            case 'btn_inbox':
+              $p.dp.buyers_order.open_component(wnd, {
+                ref: wnd.elmnts.grid.getSelectedRowId(),
+                cmd: btn_id
+              }, handlers, 'PushUtils', 'CalcOrderList');
+              break;
+
             }
           }
 
@@ -4947,10 +5202,10 @@ $p.doc.calc_order.form_list = function(pwnd, attr, handlers){
         }
 
         if(user.role_available('СогласованиеРасчетовЗаказов') || user.role_available('РедактированиеЦен') || user.role_available('РедактированиеСкидок')) {
-          source.types = 'cntr,ref,ref,txt,ro,calck,calck,calck,calck,ref,calck,calck,ro,calck,calck,ro';
+          source.types = 'cntr,ref,ref,txt,ro,ro,ro,ro,calck,ref,calck,calck,ro,calck,calck,ro';
         }
         else {
-          source.types = 'cntr,ref,ref,txt,ro,calck,calck,calck,calck,ref,ro,calck,ro,calck,calck,ro';
+          source.types = 'cntr,ref,ref,txt,ro,ro,ro,ro,calck,ref,ro,calck,ro,calck,calck,ro';
         }
 
         _meta_patched = true;
@@ -5078,8 +5333,12 @@ $p.doc.calc_order.form_list = function(pwnd, attr, handlers){
           ]
         }
       });
-      wnd.elmnts.pg_left.xcell_action = function (component) {
-        $p.dp.buyers_order.open_component(wnd, o, handlers, component);
+      wnd.elmnts.pg_left.xcell_action = function (component, fld) {
+        $p.dp.buyers_order.open_component(wnd, {
+          ref: o.ref,
+          cmd: fld,
+          _mgr: _mgr,
+        }, handlers, component);
       }
 
       /**
@@ -5272,12 +5531,24 @@ $p.doc.calc_order.form_list = function(pwnd, attr, handlers){
         $p.dp.buyers_order.open_component(wnd, o, handlers, 'CalcOrderAdditions');
         break;
 
+      case 'btn_share':
+        $p.dp.buyers_order.open_component(wnd, {ref: o.ref, cmd: btn_id}, handlers, 'PushUtils');
+        break;
+
       case 'btn_add_material':
         add_material();
         break;
 
       case 'btn_edit':
         open_builder();
+        break;
+
+      case 'btn_recalc_row':
+        recalc('row');
+        break;
+
+      case 'btn_recalc_doc':
+        recalc('doc');
         break;
 
       case 'btn_spec':
@@ -5596,11 +5867,58 @@ $p.doc.calc_order.form_list = function(pwnd, attr, handlers){
     }
 
     /**
+     * Пересчитывает строку или весь заказ
+     * @param [mode] {String} - если 'row' - пересчет строки
+     */
+    function recalc(mode) {
+      if(mode == 'row') {
+        const selId = production_get_sel_index();
+        if(selId == undefined) {
+          return not_production();
+        }
+        const row = o.production.get(selId);
+        if(row) {
+          const {owner, calc_order} = row.characteristic;
+          let ox;
+          if(row.characteristic.empty() || calc_order.empty() || owner.is_procedure || owner.is_accessory) {
+            return not_production();
+          }
+          else if(row.characteristic.coordinates.count() == 0) {
+            // возможно, это подчиненная продукция
+            if(row.characteristic.leading_product.calc_order == calc_order) {
+              ox = row.characteristic.leading_product;
+            }
+          }
+          else {
+            ox = row.characteristic;
+          }
+          ox && ox.recalc()
+            .catch((err) => {
+              $p.msg.show_msg({
+                title: $p.msg.bld_title,
+                type: 'alert-error',
+                text: err.stack || err.message
+              });
+            });
+        }
+      }
+      else {
+        o.recalc()
+          .catch((err) => {
+            $p.msg.show_msg({
+              title: $p.msg.bld_title,
+              type: 'alert-error',
+              text: err.stack || err.message
+            });
+          });
+      }
+    }
+
+    /**
      * ОткрытьПостроитель()
      * @param [create_new] {Boolean} - создавать новое изделие или открывать в текущей строке
      */
     function open_builder(create_new) {
-      var selId;
 
       if(create_new == 'clone') {
         const selId = production_get_sel_index();
@@ -5755,7 +6073,7 @@ $p.doc.calc_order.form_selection = function(pwnd, attr){
 ((_mgr) => {
 
   // переопределяем формирование списка выбора
-  const {form, tabular_sections} = _mgr.metadata()
+  const {form, tabular_sections} = _mgr.metadata();
   tabular_sections.production.fields.characteristic._option_list_local = true;
 
   // структура дополнительных форм, связанных с реквизитами
@@ -5784,7 +6102,7 @@ $p.doc.calc_order.form_selection = function(pwnd, attr){
       },
       passport_date: {
         synonym: 'Дата выдачи паспорта',
-        type: {types: ['date'], date_part: 'date'}
+        type: {types: ['string'], str_len: 20}
       },
       note: {
         synonym: 'Дополнительно',
@@ -5796,29 +6114,45 @@ $p.doc.calc_order.form_selection = function(pwnd, attr){
     obj: {
       items: [
         {
-          element: 'DataField',
-          fld: 'surname',
-        },
-        {
-          element: 'DataField',
-          fld: 'name',
-        },
-        {
-          element: 'DataField',
-          fld: 'patronymic',
-        },
-        {
-          element: 'DataField',
-          fld: 'passport_serial_number',
-        },
-        {
-          element: 'DataField',
-          fld: 'passport_date',
-        },
-        {
-          element: 'DataField',
-          fld: 'note',
-        },
+          element: 'FormGroup',
+          row: true,
+          items: [
+            {
+              element: 'FormGroup',
+              items: [
+                {
+                  element: 'DataField',
+                  fld: 'surname',
+                },
+                {
+                  element: 'DataField',
+                  fld: 'name',
+                },
+                {
+                  element: 'DataField',
+                  fld: 'patronymic',
+                },
+              ]
+            },
+            {
+              element: 'FormGroup',
+              items: [
+                {
+                  element: 'DataField',
+                  fld: 'passport_serial_number',
+                },
+                {
+                  element: 'DataField',
+                  fld: 'passport_date',
+                },
+                {
+                  element: 'DataField',
+                  fld: 'note',
+                },
+              ]
+            }
+          ]
+        }
       ]
     },
     // форма выбора
@@ -5940,7 +6274,7 @@ $p.doc.calc_order.form_selection = function(pwnd, attr){
     dst._data.before_save_sync = true;
     return dst.save();
   }
-  
+
 
 })($p.doc.calc_order);
 
@@ -5958,7 +6292,7 @@ $p.doc.calc_order.form_selection = function(pwnd, attr){
 $p.doc.calc_order.__define({
 
 	rep_invoice_execution: {
-		value: function (rep) {
+		value(rep) {
 
 			var query_options = {
 					reduce: true,
@@ -6050,7 +6384,7 @@ $p.doc.calc_order.__define({
 	},
 
 	rep_planing: {
-		value: function (rep, attr) {
+		value(rep, attr) {
 
 			var date_from = $p.utils.date_add_day(new Date(), -1, true),
 				date_till = $p.utils.date_add_day(date_from, 7, true),
@@ -6306,22 +6640,30 @@ class Pricing {
           return !loc && this.by_range();
         })
         .then(() => {
+          const {pouch} = $p.adapters;
           // излучаем событие "можно открывать формы"
-          $p.adapters.pouch.emit('pouch_complete_loaded');
+          pouch.emit('pouch_complete_loaded');
+
           // следим за изменениями документа установки цен, чтобы при необходимости обновить кеш
-          $p.doc.nom_prices_setup.pouch_db.changes({
-            since: 'now',
-            live: true,
-            include_docs: true,
-            selector: {class_name: {$in: ['doc.nom_prices_setup', 'cat.formulas']}}
-          }).on('change', (change) => {
-            // формируем новый
-            if(change.doc.class_name == 'doc.nom_prices_setup'){
-              setTimeout(() => {
-                this.by_doc(change.doc)
-              }, 1000);
-            }
-          });
+          if(pouch.local.doc === pouch.remote.doc) {
+            pouch.local.doc.changes({
+              since: 'now',
+              live: true,
+              include_docs: true,
+              selector: {class_name: {$in: ['doc.nom_prices_setup', 'doc.calc_order', 'cat.formulas']}}
+            }).on('change', (change) => {
+              // формируем новый
+              if(change.doc.class_name == 'doc.nom_prices_setup'){
+                setTimeout(() => {
+                  this.by_doc(change.doc)
+                }, 1000);
+              }
+              else if(change.doc.class_name == 'doc.calc_order'){
+                pouch.load_changes({docs: [change.doc], update_only: true});
+              }
+            });
+          }
+
         })
     });
 
@@ -7004,6 +7346,8 @@ class ProductsBuilding {
       cnn_elmnts,
       glass_specification,
       params;
+
+    //this._editor_invisible = null;
 
 
     /**
@@ -7724,23 +8068,22 @@ class ProductsBuilding {
           });
         }
         else {
-          ox.svg = scheme.get_svg();
+          if(attr.svg !== false) {
+            ox.svg = scheme.get_svg();
+          }
           saver = ox.save();
         }
 
         saver.then(() => {
-            $p.msg.show_msg([ox.name, 'Спецификация рассчитана']);
-            delete scheme._attr._saving;
-            ox.calc_order.characteristic_saved(scheme, attr);
-            scheme._scope.eve.emit('characteristic_saved', scheme, attr);
+          attr.svg !== false && $p.msg.show_msg([ox.name, 'Спецификация рассчитана']);
+          delete scheme._attr._saving;
+          ox.calc_order.characteristic_saved(scheme, attr);
+          scheme._scope && scheme._scope.eve.emit('characteristic_saved', scheme, attr);
 
-            // console.timeEnd("save");
-            // console.profileEnd();
-
-          })
-          .then(() => setTimeout(() => {
-            ox.calc_order._modified && ox.calc_order.save();
-          }, 1000))
+          // console.timeEnd("save");
+          // console.profileEnd();
+        })
+          .then(() => scheme._scope && setTimeout(() => ox.calc_order._modified && ox.calc_order.save(), 1000))
           .catch((ox) => {
 
             // console.timeEnd("save");
@@ -7763,6 +8106,13 @@ class ProductsBuilding {
     };
 
   }
+
+  // get editor_invisible() {
+  //   if(!this._editor_invisible) {
+  //     this._editor_invisible = new $p.EditorInvisible();
+  //   }
+  //   return this._editor_invisible;
+  // }
 
   /**
    * Проверяет соответствие параметров отбора параметрам изделия

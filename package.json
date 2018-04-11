@@ -1,7 +1,7 @@
 {
   "name": "windowbuilder-parametric",
   "description": "Parametric orders for windowbuilder project",
-  "version": "2.0.237",
+  "version": "2.0.238",
   "author": "Evgeniy Malyarov <info@oknosoft.ru> (http://www.oknosoft.ru)",
   "license": "SEE LICENSE IN LICENSE.en.md",
   "main": "index.js",
@@ -21,9 +21,9 @@
     "koa": "^2.5.0",
     "koa-better-router": "^2.1",
     "md5-file": "^3.2.3",
-    "metadata-abstract-ui": "2.0.16-beta.55",
-    "metadata-core": "2.0.16-beta.55",
-    "metadata-pouchdb": "2.0.16-beta.55",
+    "metadata-abstract-ui": "2.0.16-beta.56",
+    "metadata-core": "2.0.16-beta.56",
+    "metadata-pouchdb": "2.0.16-beta.56",
     "request": "^2.85.0"
   },
   "devDependencies": {
@@ -33,7 +33,7 @@
     "babel-plugin-syntax-object-rest-spread": "^6.13.0",
     "babel-plugin-transform-class-properties": "^6.24.1",
     "babel-preset-node8": "^1.2.0",
-    "eslint": "^4.19.0",
+    "eslint": "^4.19.1",
     "eslint-config-react-app": "^2.1.0",
     "eslint-plugin-promise": "^3.7.0",
     "eslint-plugin-react": "^7.7.0",
@@ -44,7 +44,7 @@
     "gulp-strip-comments": "^2.5.2",
     "gulp-wrap": "^0.13.0",
     "webpack": "^3.11.0",
-    "webpack-node-externals": "^1.6.0"
+    "webpack-node-externals": "^1.7.2"
   },
   "homepage": "http://www.oknosoft.ru/zd/",
   "repository": {
