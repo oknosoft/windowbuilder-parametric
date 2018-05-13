@@ -2,8 +2,6 @@
  * ### Дополнительные методы плана видов характеристик _Свойства объектов_
  * аналог подсистемы _Свойства_ БСП
  *
- * &copy; Evgeniy Malyarov http://www.oknosoft.ru 2014-2018
- *
  * @module cch_properties
  */
 
@@ -21,7 +19,7 @@ export default function ($p) {
      * @return {Boolean}
      */
     check_mandatory: {
-      value: function (prms, title) {
+      value(prms, title) {
 
         var t, row;
 
@@ -50,7 +48,7 @@ export default function ($p) {
      * @return {Array}
      */
     slist: {
-      value: function (prop, ret_mgr) {
+      value(prop, ret_mgr) {
 
         var res = [], rt, at, pmgr, op = this.get(prop);
 
@@ -67,19 +65,13 @@ export default function ($p) {
                 }
 
                 if(pmgr.class_name == 'enm.open_directions') {
-                  pmgr.get_option_list().forEach(function (v) {
-                    if(v.value && v.value != $p.enm.tso.folding) {
-                      res.push(v);
-                    }
-                  });
+                  pmgr.get_option_list().forEach((v) => v.value && v.value != $p.enm.tso.folding && res.push(v));
                 }
                 else if(pmgr.class_name.indexOf('enm.') != -1 || !pmgr.metadata().has_owners) {
                   res = pmgr.get_option_list();
                 }
                 else {
-                  pmgr.find_rows({owner: prop}, function (v) {
-                    res.push({value: v.ref, text: v.presentation});
-                  });
+                  pmgr.find_rows({owner: prop}, (v) => res.push({value: v.ref, text: v.presentation}));
                 }
               }
             }
@@ -99,8 +91,14 @@ export default function ($p) {
      * @type Boolean
      */
     is_calculated: {
-      get: function () {
+      get() {
         return ($p.job_prm.properties.calculated || []).indexOf(this) != -1;
+      }
+    },
+
+    show_calculated: {
+      get() {
+        return ($p.job_prm.properties.show_calculated || []).indexOf(this) != -1;
       }
     },
 
@@ -112,7 +110,7 @@ export default function ($p) {
      * @param [obj.ox]
      */
     calculated_value: {
-      value: function (obj) {
+      value(obj) {
         if(!this._calculated_value) {
           if(this._formula) {
             this._calculated_value = $p.cat.formulas.get(this._formula);
@@ -129,7 +127,7 @@ export default function ($p) {
      * ### Проверяет условие в строке отбора
      */
     check_condition: {
-      value: function ({row_spec, prm_row, elm, cnstr, origin, ox, calc_order}) {
+      value({row_spec, prm_row, elm, cnstr, origin, ox, calc_order}) {
 
         const {is_calculated} = this;
         const {utils, enm: {comparison_types}} = $p;
@@ -187,7 +185,7 @@ export default function ($p) {
      * Извлекает значение параметра с учетом вычисляемости
      */
     extract_value: {
-      value: function ({comparison_type, txt_row, value}) {
+      value({comparison_type, txt_row, value}) {
 
         switch (comparison_type) {
 
@@ -200,7 +198,7 @@ export default function ($p) {
           try {
             const arr = JSON.parse(txt_row);
             const {types} = this.type;
-            if(types.length == 1) {
+            if(types && types.length == 1) {
               const mgr = $p.md.mgr_by_class_name(types[0]);
               return arr.map((ref) => mgr.get(ref, false));
             }
@@ -220,7 +218,7 @@ export default function ($p) {
      * Возвращает массив связей текущего параметра
      */
     params_links: {
-      value: function (attr) {
+      value(attr) {
 
         // первым делом, выясняем, есть ли ограничитель на текущий параметр
         if(!this.hasOwnProperty('_params_links')) {
@@ -228,20 +226,39 @@ export default function ($p) {
         }
 
         return this._params_links.filter((link) => {
-          let ok = true;
-          // для всех записей ключа параметров
-          link.master.params.forEach((row) => {
-            // выполнение условия рассчитывает объект CchProperties
-            ok = row.property.check_condition({
-              cnstr: attr.grid.selection.cnstr,
-              ox: attr.obj._owner._owner,
-              prm_row: row,
-              elm: attr.obj,
+          //use_master бывает 0 - один ведущий, 1 - несколько ведущих через И, 2 - несколько ведущих через ИЛИ
+          const use_master = link.use_master || 0;
+          let ok = true && use_master < 2;
+          //в зависимости от use_master у нас массив либо из одного, либо из нескольких ключей ведущиъ для проверки
+          const arr = !use_master ? [{key:link.master}] : link.leadings;
+
+          arr.forEach((row_key) => {
+            let ok_key = true;
+            // для всех записей ключа параметров
+            row_key.key.params.forEach((row) => {
+              // выполнение условия рассчитывает объект CchProperties
+              ok_key = row.property.check_condition({
+                cnstr: attr.grid.selection.cnstr,
+                ox: attr.obj._owner._owner,
+                prm_row: row,
+                elm: attr.obj,
+              });
+              //Если строка условия в ключе не выполняется, то дальше проверять его условия смысла нет
+              if (!ok_key) {
+                return false;
+              }
             });
-            if(!ok) {
+            //Для проверки через ИЛИ логика накопительная - надо проверить все ключи до единого
+            if (use_master == 2){
+              ok = ok || ok_key;
+            }
+            //Для проверки через И достаточно найти один неподходящий ключ, чтобы остановиться и признать связь неподходящей
+            else if (!ok_key){
+              ok = false;
               return false;
             }
           });
+          //Конечный возврат в функцию фильтрации массива связей
           return ok;
         });
       }
@@ -251,7 +268,7 @@ export default function ($p) {
      * Проверяет и при необходимости перезаполняет или устанваливает умолчание value в prow
      */
     linked_values: {
-      value: function (links, prow) {
+      value(links, prow) {
         const values = [];
         let changed;
         // собираем все доступные значения в одном массиве
@@ -291,9 +308,12 @@ export default function ($p) {
      * @param attr {Object} - атрибуты OCombo
      */
     filter_params_links: {
-      value: function (filter, attr) {
+      value(filter, attr, links) {
         // для всех отфильтрованных связей параметров
-        this.params_links(attr).forEach((link) => {
+        if(!links) {
+          links = this.params_links(attr);
+        }
+        links.forEach((link) => {
           // если ключ найден в параметрах, добавляем фильтр
           if(!filter.ref) {
             filter.ref = {in: []};

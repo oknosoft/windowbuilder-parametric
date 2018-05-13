@@ -400,7 +400,7 @@ $p.CatCharacteristics = class CatCharacteristics extends $p.CatCharacteristics {
     });
 
     inset.used_params.forEach((param) => {
-      if(params.indexOf(param) == -1) {
+      if((!param.is_calculated || param.show_calculated) && params.indexOf(param) == -1) {
         ts_params.add({
           cnstr: cnstr,
           inset: blank_inset || inset,
@@ -800,14 +800,33 @@ $p.CatCharacteristics.builder_props_defaults = {
 $p.CatCharacteristicsInsertsRow.prototype.value_change = function (field, type, value) {
   // для вложенных вставок перезаполняем параметры
   if(field == 'inset') {
-    if(value != this.inset){
+    if (value != this.inset) {
       const {_owner} = this._owner;
+      const {cnstr} = this;
+
+      //Проверяем дубли вставок (их не должно быть, иначе параметры перезаписываются)
+      if (value != $p.utils.blank.guid) {
+        const res = _owner.params.find_rows({cnstr, inset: value, row: {not: this.row}});
+        if (res.length) {
+          $p.md.emit('alert', {
+            obj: _owner,
+            row: this,
+            title: $p.msg.data_error,
+            type: 'alert-error',
+            text: 'Нельзя добавлять две одинаковые вставки в один контур'
+          });
+          return false;
+        }
+      }
+
       // удаляем параметры старой вставки
-      !this.inset.empty() && _owner.params.clear({inset: this.inset, cnstr: this.cnstr});
+      !this.inset.empty() && _owner.params.clear({inset: this.inset, cnstr});
+
       // устанавливаем значение новой вставки
       this._obj.inset = value;
+
       // заполняем параметры по умолчанию
-      _owner.add_inset_params(this.inset, this.cnstr);
+      _owner.add_inset_params(this.inset, cnstr);
     }
   }
 }
@@ -1794,7 +1813,8 @@ Object.defineProperties($p.cat.divisions, {
         return 0;
       })
       return Promise.resolve(l);
-    }
+    },
+    writable: true
   }
 });
 
@@ -1813,7 +1833,7 @@ $p.CatElm_visualization.prototype.__define({
 	draw: {
 		value(elm, layer, offset) {
 
-		  const {CompoundPath, constructor} = elm.project._scope;
+		  const {CompoundPath, PointText, constructor} = elm.project._scope;
 
 			let subpath;
 
@@ -1822,67 +1842,78 @@ $p.CatElm_visualization.prototype.__define({
 				const attr = JSON.parse(this.svg_path);
 
 				if(attr.method == "subpath_outer"){
-
 					subpath = elm.rays.outer.get_subpath(elm.corns(1), elm.corns(2)).equidistant(attr.offset || 10);
-
 					subpath.parent = layer._by_spec;
 					subpath.strokeWidth = attr.strokeWidth || 4;
 					subpath.strokeColor = attr.strokeColor || 'red';
 					subpath.strokeCap = attr.strokeCap || 'round';
-					if(attr.dashArray)
-						subpath.dashArray = attr.dashArray
-
+					if(attr.dashArray){
+            subpath.dashArray = attr.dashArray
+          }
 				}
-
 			}
 			else if(this.svg_path){
 
-				subpath = new CompoundPath({
-					pathData: this.svg_path,
-					parent: layer._by_spec,
-					strokeColor: 'black',
-					fillColor: 'white',
-					strokeScaling: false,
-					pivot: [0, 0],
-					opacity: elm.opacity
-				});
+        if(this.mode === 1) {
+          const attr = JSON.parse(this.attributes || '{}');
+          subpath = new PointText(Object.assign({
+            parent: layer._by_spec,
+            fillColor: 'black',
+            fontFamily: 'Mipgost',
+            fontSize: attr.fontSize || 60,
+            guide: true,
+            content: this.svg_path,
+          }, attr));
+        }
+        else {
+          subpath = new CompoundPath({
+            pathData: this.svg_path,
+            parent: layer._by_spec,
+            strokeColor: 'black',
+            fillColor: elm.constructor.clr_by_clr.call(elm, elm._row.clr, false),
+            strokeScaling: false,
+            guide: true,
+            pivot: [0, 0],
+            opacity: elm.opacity
+          });
+        }
 
 				if(elm instanceof constructor.Filling) {
           subpath.position = elm.bounds.topLeft.add([20,10]);
         }
         else {
-
+          const {generatrix, rays: {inner, outer}} = elm;
           // угол касательной
-          var angle_hor;
+          let angle_hor;
           if(elm.is_linear() || offset < 0)
-            angle_hor = elm.generatrix.getTangentAt(0).angle;
-          else if(offset > elm.generatrix.length)
-            angle_hor = elm.generatrix.getTangentAt(elm.generatrix.length).angle;
+            angle_hor = generatrix.getTangentAt(0).angle;
+          else if(offset > generatrix.length)
+            angle_hor = generatrix.getTangentAt(generatrix.length).angle;
           else
-            angle_hor = elm.generatrix.getTangentAt(offset).angle;
+            angle_hor = generatrix.getTangentAt(offset).angle;
 
           if((this.rotate != -1 || elm.orientation == $p.enm.orientations.Горизонтальная) && angle_hor != this.angle_hor){
             subpath.rotation = angle_hor - this.angle_hor;
           }
 
-          offset += elm.generatrix.getOffsetOf(elm.generatrix.getNearestPoint(elm.corns(1)));
+          offset += generatrix.getOffsetOf(generatrix.getNearestPoint(elm.corns(1)));
 
-          const p0 = elm.generatrix.getPointAt(offset > elm.generatrix.length ? elm.generatrix.length : offset || 0);
+          const p0 = generatrix.getPointAt(offset > generatrix.length ? generatrix.length : offset || 0);
 
           if(this.elm_side == -1){
             // в середине элемента
-            const p1 = elm.rays.inner.getNearestPoint(p0);
-            const p2 = elm.rays.outer.getNearestPoint(p0);
+            const p1 = inner.getNearestPoint(p0);
+            const p2 = outer.getNearestPoint(p0);
 
             subpath.position = p1.add(p2).divide(2);
 
           }else if(!this.elm_side){
             // изнутри
-            subpath.position = elm.rays.inner.getNearestPoint(p0);
+            subpath.position = inner.getNearestPoint(p0);
 
           }else{
             // снаружи
-            subpath.position = elm.rays.outer.getNearestPoint(p0);
+            subpath.position = outer.getNearestPoint(p0);
           }
         }
 
@@ -1890,75 +1921,6 @@ $p.CatElm_visualization.prototype.__define({
 		}
 	}
 
-});
-
-/**
- *
- * &copy; Evgeniy Malyarov http://www.oknosoft.ru 2014-2018
- *
- * Created 17.04.2016
- *
- * @module cat_formulas
- *
- */
-
-$p.CatFormulas.prototype.__define({
-
-	execute: {
-		value(obj, attr) {
-
-			// создаём функцию из текста формулы
-			if(!this._data._formula && this.formula){
-			  try{
-          if(this.async){
-            const AsyncFunction = Object.getPrototypeOf(async function(){}).constructor;
-            this._data._formula = (new AsyncFunction("obj,$p,attr", this.formula)).bind(this);
-          }
-          else{
-            this._data._formula = (new Function("obj,$p,attr", this.formula)).bind(this);
-          }
-        }
-        catch(err){
-          this._data._formula = () => false;
-          $p.record_log(err);
-        }
-      }
-
-      const {_formula} = this._data;
-
-			if(this.parent == $p.cat.formulas.predefined("printing_plates")){
-
-        if(!_formula){
-          $p.msg.show_msg({
-            title: $p.msg.bld_title,
-            type: "alert-error",
-            text: `Ошибка в формуле<br /><b>${this.name}</b>`
-          });
-          return Promise.resolve();
-        }
-
-				// получаем HTMLDivElement с отчетом
-				return _formula(obj, $p, attr)
-
-				  // показываем отчет в отдельном окне
-					.then((doc) => doc instanceof $p.SpreadsheetDocument && doc.print());
-
-			}
-			else{
-        return _formula && _formula(obj, $p, attr)
-      }
-
-		}
-	},
-
-	_template: {
-		get() {
-			if(!this._data._template){
-        this._data._template = new $p.SpreadsheetDocument(this.template);
-      }
-			return this._data._template;
-		}
-	}
 });
 
 /**
@@ -2078,7 +2040,7 @@ $p.CatFurns = class CatFurns extends $p.CatFurns {
           if(row.forcibly || forcibly){
             prm_row.value = row.value;
           }
-          prm_row.hide = row.hide || param.is_calculated;
+          prm_row.hide = row.hide || (param.is_calculated && !param.show_calculated);
           return false;
         }
       });
@@ -2091,11 +2053,12 @@ $p.CatFurns = class CatFurns extends $p.CatFurns {
 
     });
 
-    // удаляем лишние строки
+    // удаляем лишние строки, сохраняя параметры допвставок
     const adel = [];
-    fprms.find_rows({cnstr: cnstr}, (row) => {
-      if(aprm.indexOf(row.param) == -1)
+    fprms.find_rows({cnstr: cnstr, inset: $p.utils.blank.guid}, (row) => {
+      if(aprm.indexOf(row.param) == -1){
         adel.push(row);
+      }
     });
     adel.forEach((row) => fprms.del(row, true));
 
@@ -2337,7 +2300,7 @@ $p.CatFurnsSpecificationRow = class CatFurnsSpecificationRow extends $p.CatFurns
           const elm = contour.profile_by_furn_side(row.side, cache);
           len = elm ? (elm._row.len - 2 * elm.nom.sizefurn) : 0;
         }
-        len = len.round(0);
+        len = len.round();
         if (len < row.lmin || len > row.lmax) {
           return res = false;
         }
@@ -3511,14 +3474,39 @@ $p.CatProduction_params.prototype.__define({
 	 */
 	noms: {
 		get(){
-			var __noms = [];
-			this.elmnts._obj.forEach(function(row){
-				if(!$p.utils.is_empty_guid(row.nom) && __noms.indexOf(row.nom) == -1)
-					__noms.push(row.nom);
-			});
-			return __noms;
+			const noms = [];
+			this.elmnts._obj.forEach(({nom}) => !$p.utils.is_empty_guid(nom) && noms.indexOf(nom) == -1 && noms.push(nom));
+			return noms;
 		}
 	},
+
+  /**
+   * возвращает доступные в данной системе фурнитуры
+   * данные получает из справчоника СвязиПараметров, где ведущий = текущей системе и ведомый = фурнитура
+   * @property furns
+   * @for Production_params
+   */
+  furns: {
+    value(ox){
+      const {furn} = $p.job_prm.properties;
+      const {furns} = $p.cat;
+      const list = [];
+      if(furn){
+        const links = furn.params_links({
+          grid: {selection: {cnstr: 0}},
+          obj: {_owner: {_owner: ox}}
+        });
+        if(links.length){
+          // собираем все доступные значения в одном массиве
+          links.forEach((link) => link.values._obj.forEach(({value, by_default, forcibly}) => {
+            const v = furns.get(value);
+            v && list.push({furn: v, by_default, forcibly});
+          }));
+        }
+      }
+      return list;
+    }
+  },
 
 	/**
 	 * возвращает доступные в данной системе элементы (вставки)
@@ -3633,8 +3621,52 @@ $p.CatProduction_params.prototype.__define({
 				ox.sys = this;
 				ox.owner = ox.prod_nom;
 
+				// если текущая фурнитура недоступна для данной системы - меняем
+        const furns = this.furns(ox);
+
 				// одновременно, перезаполним параметры фурнитуры
-				ox.constructions.forEach((row) => !row.furn.empty() && ox.sys.refill_prm(ox, row.cnstr))
+				ox.constructions.forEach((row) => {
+          if(!row.furn.empty()) {
+            let changed;
+            // если для системы через связи параметров ограничен список фурнитуры...
+            if(furns.length) {
+              if(furns.some((frow) => {
+                if(frow.forcibly) {
+                  row.furn = frow.furn;
+                  return changed = true;
+                }
+              })) {
+                ;
+              }
+              else if(furns.some((frow) => row.furn === frow.furn)) {
+                ;
+              }
+              else if(furns.some((frow) => {
+                if(frow.by_default) {
+                  row.furn = frow.furn;
+                  return changed = true;
+                }
+              })) {
+                ;
+              }
+              else {
+                row.furn = furns[0].furn;
+                changed = true;
+              }
+            }
+
+            if(changed) {
+              const contour = paper.project && paper.project.getItem({cnstr: row.cnstr});
+              if(contour) {
+                row.furn.refill_prm(contour);
+                contour.notify(contour, 'furn_changed');
+              }
+              else {
+                ox.sys.refill_prm(ox, row.cnstr);
+              }
+            }
+          }
+        });
 			}
 		}
 	}
@@ -4116,14 +4148,7 @@ $p.DocCalc_order = class DocCalc_order extends $p.DocCalc_order {
 
           }
           else {
-            if($p.job_prm.use_svgs) {
-              get_imgs.push(characteristics.get_attachment(row.characteristic.ref, 'svg')
-                .then(blob_as_text)
-                .then((svg_text) => res.ПродукцияЭскизы[row.characteristic.ref] = svg_text)
-                .catch((err) => err && err.status != 404 && $p.record_log(err))
-              );
-            }
-            else if(row.characteristic.svg) {
+            if(row.characteristic.svg) {
               res.ПродукцияЭскизы[row.characteristic.ref] = row.characteristic.svg;
             }
           }
@@ -5892,17 +5917,22 @@ $p.doc.calc_order.form_list = function(pwnd, attr, handlers){
           else {
             ox = row.characteristic;
           }
-          ox && ox.recalc()
-            .catch((err) => {
-              $p.msg.show_msg({
-                title: $p.msg.bld_title,
-                type: 'alert-error',
-                text: err.stack || err.message
-              });
-            });
+          if(ox) {
+            wnd.progressOn();
+            ox.recalc()
+              .catch((err) => {
+                $p.msg.show_msg({
+                  title: $p.msg.bld_title,
+                  type: 'alert-error',
+                  text: err.stack || err.message
+                });
+              })
+              .then(() => wnd.progressOff());
+          }
         }
       }
       else {
+        wnd.progressOn();
         o.recalc()
           .catch((err) => {
             $p.msg.show_msg({
@@ -5910,7 +5940,8 @@ $p.doc.calc_order.form_list = function(pwnd, attr, handlers){
               type: 'alert-error',
               text: err.stack || err.message
             });
-          });
+          })
+          .then(() => wnd.progressOff());
       }
     }
 
@@ -6741,8 +6772,7 @@ class Pricing {
     return pouch.remote.doc.get(`_local/price_${step}`)
       .then((remote) => {
         return pouch.local.doc.get(`_local/price_${step}`)
-          .then((local) => local)
-          .catch(() => {})
+          .catch(() => ({}))
           .then((local) => {
             // грузим цены из remote
             this.build_cache_local(remote);
@@ -8058,23 +8088,11 @@ class ProductsBuilding {
         // console.profile();
 
         // сохраняем картинку вместе с изделием
-        let saver;
-        if($p.job_prm.use_svgs) {
-          ox.save(undefined, undefined, {
-            svg: {
-              content_type: 'image/svg+xml',
-              data: new Blob([scheme.get_svg()], {type: 'image/svg+xml'})
-            }
-          });
-        }
-        else {
-          if(attr.svg !== false) {
-            ox.svg = scheme.get_svg();
-          }
-          saver = ox.save();
+        if(attr.svg !== false) {
+          ox.svg = scheme.get_svg();
         }
 
-        saver.then(() => {
+        ox.save().then(() => {
           attr.svg !== false && $p.msg.show_msg([ox.name, 'Спецификация рассчитана']);
           delete scheme._attr._saving;
           ox.calc_order.characteristic_saved(scheme, attr);
@@ -8083,7 +8101,7 @@ class ProductsBuilding {
           // console.timeEnd("save");
           // console.profileEnd();
         })
-          .then(() => scheme._scope && setTimeout(() => ox.calc_order._modified && ox.calc_order.save(), 1000))
+          .then(() => (scheme._scope || attr.close) && setTimeout(() => ox.calc_order._modified && ox.calc_order.save(), 1000))
           .catch((ox) => {
 
             // console.timeEnd("save");
@@ -8106,13 +8124,6 @@ class ProductsBuilding {
     };
 
   }
-
-  // get editor_invisible() {
-  //   if(!this._editor_invisible) {
-  //     this._editor_invisible = new $p.EditorInvisible();
-  //   }
-  //   return this._editor_invisible;
-  // }
 
   /**
    * Проверяет соответствие параметров отбора параметрам изделия
