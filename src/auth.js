@@ -25,6 +25,7 @@ module.exports = async (ctx, $p) => {
   const resp = await new Promise((resolve, reject) => {
 
     try{
+      // получаем строку из заголовка авторизации
       const auth = new Buffer(authorization.substr(6), 'base64').toString();
       const sep = auth.indexOf(':');
       _auth.pass = auth.substr(sep + 1);

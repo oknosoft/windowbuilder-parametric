@@ -24,7 +24,7 @@
     "metadata-abstract-ui": "2.0.16-beta.58",
     "metadata-core": "2.0.16-beta.58",
     "metadata-pouchdb": "2.0.16-beta.58",
-    "request": "^2.85.0"
+    "request": "^2.86.0"
   },
   "devDependencies": {
     "babel-core": "^6.26.3",
@@ -39,7 +39,7 @@
     "eslint-plugin-react": "^7.8.2",
     "gulp": "^3.9",
     "gulp-concat": "^2.6",
-    "gulp-rename": "^1.2",
+    "gulp-rename": "^1.2.3",
     "gulp-replace": "^0.6",
     "gulp-strip-comments": "^2.5.2",
     "gulp-wrap": "^0.13.0",

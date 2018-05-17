@@ -402,7 +402,7 @@ module.exports = require("koa");
 
 
 /**
- *
+ * логирование и контроль сессии
  *
  * @module log
  *
@@ -411,6 +411,8 @@ module.exports = require("koa");
 
 const $p = __webpack_require__(1);
 const auth = __webpack_require__(17);
+
+const sessions = {};
 
 function getBody(req) {
   return new Promise((resolve, reject) => {
@@ -466,13 +468,27 @@ module.exports = async (ctx, next) => {
 
   if (ctx._auth) {
     try {
-      // тело запроса анализируем только для авторизованных пользователей
-      log.post_data = await getBody(ctx.req);
-      ctx._query = log.post_data.length > 0 ? JSON.parse(log.post_data) : {};
-      // передаём управление основной задаче
-      await next();
-      // по завершению, записываем лог
-      saveLog({ _id, log, start, body: log.url.indexOf('prm/doc.calc_order') != -1 && ctx.body });
+
+      // проверяем и устанавливаем сессию
+      const { suffix } = ctx._auth;
+      if (sessions.hasOwnProperty(suffix) && Date.now() - sessions[suffix] < 10000) {
+        ctx.status = 403;
+        log.error = ctx.body = 'flood: concurrent requests';
+        saveLog({ _id, log, start, body: ctx.body });
+      } else {
+        sessions[suffix] = Date.now();
+
+        // тело запроса анализируем только для авторизованных пользователей
+        log.post_data = await getBody(ctx.req);
+        ctx._query = log.post_data.length > 0 ? JSON.parse(log.post_data) : {};
+        // передаём управление основной задаче
+        await next();
+        // по завершению, записываем лог
+        saveLog({ _id, log, start, body: log.url.indexOf('prm/doc.calc_order') != -1 && ctx.body });
+
+        // сбрасываем сессию
+        sessions[suffix] = 0;
+      }
     } catch (err) {
       // в случае ошибки, так же, записываем лог
       log.error = err.message;
@@ -9404,6 +9420,7 @@ module.exports = async (ctx, $p) => {
   const resp = await new Promise((resolve, reject) => {
 
     try {
+      // получаем строку из заголовка авторизации
       const auth = new Buffer(authorization.substr(6), 'base64').toString();
       const sep = auth.indexOf(':');
       _auth.pass = auth.substr(sep + 1);
