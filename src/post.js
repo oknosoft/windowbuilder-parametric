@@ -71,14 +71,25 @@ async function calc_order(ctx, next) {
       }
       const property = job_prm.properties[fld];
       if(property && !property.empty()){
+        const {type} = property;
         let finded;
+        let value = _query[fld];
+        if(type.date_part) {
+          value = utils.fix_date(value, !type.hasOwnProperty('str_len'));
+        }
+        else if(type.digits) {
+          value = utils.fix_number(value, !type.hasOwnProperty('str_len'));
+        }
+        else if(type.types[0] == 'boolean') {
+          value = utils.fix_boolean(value);
+        }
         o.extra_fields.find_rows({property}, (row) => {
-          row.value = _query[fld];
+          row.value = value;
           finded = true;
           return false;
         });
         if(!finded){
-          o.extra_fields.add({property, value: _query[fld]});
+          o.extra_fields.add({property, value});
         }
       }
     }
@@ -198,16 +209,27 @@ async function delivery(ctx, next) {
           if(!prop) {
             continue;
           }
+          const {type} = prop;
+          let value = set[name];
+          if(type.date_part) {
+            value = utils.fix_date(value, !type.hasOwnProperty('str_len'));
+          }
+          else if(type.digits) {
+            value = utils.fix_number(value, !type.hasOwnProperty('str_len'));
+          }
+          else if(type.types[0] == 'boolean') {
+            value = utils.fix_boolean(value);
+          }
           if(!doc.extra_fields.some((row) => {
             if(row.property == prop) {
-              if(row.value !== set[name]) {
+              if(row.value !== value) {
                 modified = true;
-                row.value = set[name];
+                row.value = value;
               }
               return true;
             }
           })) {
-            doc.extra_fields.push({property: prop.ref, value: set[name]});
+            doc.extra_fields.push({property: prop.ref, value});
           }
         }
 
