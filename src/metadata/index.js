@@ -1,49 +1,43 @@
-// дополняем прототип Object методами observe
-require('./observe');
 
 const debug = require('debug')('wb:meta');
 
 // конструктор MetaEngine
-const MetaEngine = require('metadata-core')
-  .plugin(require('metadata-pouchdb'));
+import metaCore from 'metadata-core';
+import metaPouchdb from 'metadata-pouchdb';
+const MetaEngine = metaCore.plugin(metaPouchdb);
+
+// функция установки параметров сеанса
+const settings = require('./config/report.settings');
+
+// функция инициализации структуры метаданных
+const meta_init = require('./src/metadata/init.js');
+
 debug('required');
 
 // создаём контекст MetaEngine
-const $p = new MetaEngine();
+const $p = global.$p = new MetaEngine();
 debug('created');
 
-// эмулируем излучатель событий dhtmlx
-require('./dhtmlx_eve')($p);
-
-// модификаторы data-объектов в старом формате
-const modifiers = require('./modifiers')
-
-// модификаторы data-объектов в новом формате
-import modifiers_new from './chartscharacteristics';
-
+// параметры сеанса инициализируем сразу
+$p.wsql.init(settings);
 
 // инициализируем параметры сеанса и метаданные
 (async () => {
 
-  // функция установки параметров сеанса
-  const config_init = require('../../config/report.settings');
-
-  // функция инициализации структуры метаданных
-  const meta_init = require('./init');
-
   // реквизиты подключения к couchdb
-  const {user_node} = config_init();
+  const {user_node} = settings();
 
-  // инициализируем метаданные
-  $p.wsql.init(config_init, meta_init);
+  // выполняем скрипт инициализации метаданных
+  meta_init($p);
 
-  // подключим модификаторы
-  modifiers($p);
-  modifiers_new($p);
-  debug('inited & modified');
+  // сообщяем адаптерам пути, суффиксы и префиксы
+  const {wsql, job_prm, adapters: {pouch}} = $p;
+  pouch.init(wsql, job_prm);
+
+  // // подключим модификаторы
+  // modifiers($p);
 
   // загружаем кешируемые справочники в ram и начинаем следить за изменениями ram
-  const {pouch} = $p.adapters;
   pouch.log_in(user_node.username, user_node.password)
     .then(() => pouch.load_data())
     .catch((err) => debug(err));
@@ -81,7 +75,7 @@ import modifiers_new from './chartscharacteristics';
 
 })();
 
-module.exports = $p;
+export default $p;
 
 
 

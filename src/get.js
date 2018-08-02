@@ -1,11 +1,11 @@
 'use strict';
 
-const debug = require('debug')('wb:get');
-const $p = require('./metadata');
+import $p from './metadata';
 
+const debug = require('debug')('wb:get');
 debug('required');
 
-function serialize_prod({o, prod, ctx}) {
+export function serialize_prod({o, prod, ctx}) {
   const flds = ['margin', 'price_internal', 'amount_internal', 'marginality', 'first_cost', 'discount', 'discount_percent',
     'discount_percent_internal', 'changed', 'ordn', 'characteristic', 'qty'];
   // человекочитаемая информация в табчасть продукции
@@ -164,7 +164,7 @@ async function array(ctx, next) {
   //ctx.body = res;
 }
 
-module.exports = async (ctx, next) => {
+export default async (ctx, next) => {
 
   try{
     switch (ctx.params.class){
@@ -196,5 +196,3 @@ module.exports = async (ctx, next) => {
   }
 
 };
-
-module.exports.serialize_prod = serialize_prod;

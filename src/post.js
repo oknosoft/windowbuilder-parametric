@@ -1,9 +1,10 @@
 'use strict';
 
-const debug = require('debug')('wb:post');
-const $p = require('./metadata');
-const {serialize_prod} = require('./get');
 
+import $p from './metadata';
+import {serialize_prod} from './get';
+
+const debug = require('debug')('wb:post');
 debug('required');
 
 
@@ -476,7 +477,7 @@ async function load_doc_ram(ctx, next) {
   ctx.body = {'doc_ram_loading_started': true};
 }
 
-module.exports = async (ctx, next) => {
+export default async (ctx, next) => {
 
   try {
     switch (ctx.params.class) {

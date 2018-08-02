@@ -1,7 +1,7 @@
 
-const request = require('request');
+import request from 'request';
 
-module.exports = async (ctx, $p) => {
+export default async (ctx, $p) => {
 
   // если указано ограничение по ip - проверяем
   const {restrict_ips} = ctx.app;
@@ -39,11 +39,10 @@ module.exports = async (ctx, $p) => {
 
       request({
         url: couch_local + zone + '_doc_' + suffix,
-        auth: {'user':_auth.username, 'pass':_auth.pass, sendImmediately: true
-        }
+        auth: {'user':_auth.username, 'pass':_auth.pass, sendImmediately: true}
       }, (e, r, body) => {
         if(r && r.statusCode < 201){
-          $p.wsql.set_user_param("user_name", _auth.username);
+          $p.wsql.set_user_param('user_name', _auth.username);
           resolve(true);
         }
         else{
