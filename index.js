@@ -1,5 +1,5 @@
 /*!
- windowbuilder-parametric v2.0.240, built:2018-08-02
+ windowbuilder-parametric v2.0.241, built:2018-08-25
  © 2014-2018 Evgeniy Malyarov and the Oknosoft team http://www.oknosoft.ru
  To obtain commercial license and technical support, contact info@oknosoft.ru
  */
