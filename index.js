@@ -1,5 +1,5 @@
 /*!
- windowbuilder-parametric v2.0.241, built:2018-08-25
+ windowbuilder-parametric v2.0.241, built:2019-01-06
  © 2014-2018 Evgeniy Malyarov and the Oknosoft team http://www.oknosoft.ru
  To obtain commercial license and technical support, contact info@oknosoft.ru
  */
@@ -9,13 +9,13 @@
 
 function _interopDefault (ex) { return (ex && (typeof ex === 'object') && 'default' in ex) ? ex['default'] : ex; }
 
+var Koa = _interopDefault(require('koa'));
+var cors = _interopDefault(require('@koa/cors'));
 var metaCore = _interopDefault(require('metadata-core'));
 var metaPouchdb = _interopDefault(require('metadata-pouchdb'));
 var request = _interopDefault(require('request'));
 var paper = _interopDefault(require('paper/dist/paper-core'));
 var Router = _interopDefault(require('koa-better-router'));
-var Koa = _interopDefault(require('koa'));
-var cors = _interopDefault(require('@koa/cors'));
 
 const debug = require('debug')('wb:meta');
 const MetaEngine = metaCore.plugin(metaPouchdb);
@@ -64,6 +64,7 @@ $p.wsql.init(settings);
   });
 })();
 
+const auth_cache = {};
 var auth = async (ctx, $p) => {
   const {restrict_ips} = ctx.app;
   const ip = ctx.req.headers['x-real-ip'] || ctx.ip;
@@ -81,8 +82,17 @@ var auth = async (ctx, $p) => {
   const {couch_local, zone} = $p.job_prm;
   const _auth = {'username':''};
   const resp = await new Promise((resolve, reject) => {
+    function set_cache(key, auth) {
+      auth_cache[key] = {stamp: Date.now(), auth};
+      resolve(auth);
+    }
+    const auth_str = authorization.substr(6);
     try{
-      const auth = new Buffer(authorization.substr(6), 'base64').toString();
+      const cached = auth_cache[auth_str];
+      if(cached && (cached.stamp + 30 * 60 * 1000) > Date.now()) {
+        return resolve(cached.auth);
+      }
+      const auth = new Buffer(auth_str, 'base64').toString();
       const sep = auth.indexOf(':');
       _auth.pass = auth.substr(sep + 1);
       _auth.username = auth.substr(0, sep);
@@ -96,18 +106,19 @@ var auth = async (ctx, $p) => {
       }, (e, r, body) => {
         if(r && r.statusCode < 201){
           $p.wsql.set_user_param('user_name', _auth.username);
-          resolve(true);
+          set_cache(auth_str, true);
         }
         else{
           ctx.status = (r && r.statusCode) || 500;
           ctx.body = body || (e && e.message);
-          resolve(false);
+          set_cache(auth_str, false);
         }
       });
     }
     catch(e){
       ctx.status = 500;
       ctx.body = e.message;
+      delete auth_cache[auth_str];
       resolve(false);
     }
   });
