@@ -26,8 +26,8 @@ export default async (ctx, $p) => {
   const _auth = {'username':''};
   const resp = await new Promise((resolve, reject) => {
 
-    function set_cache(key, auth) {
-      auth_cache[key] = {stamp: Date.now(), auth};
+    function set_cache(key, auth, username) {
+      auth_cache[key] = {stamp: Date.now(), auth, username};
       resolve(auth);
     }
 
@@ -36,7 +36,8 @@ export default async (ctx, $p) => {
     try{
       // получаем строку из заголовка авторизации
       const cached = auth_cache[auth_str];
-      if(cached && (cached.stamp + 30 * 60 * 1000) > Date.now()) {
+      if(cached && (cached.stamp + 30 * 60 * 1000) > Date.now() && cached.username) {
+        _auth.username = cached.username;
         return resolve(cached.auth);
       }
 
@@ -57,7 +58,7 @@ export default async (ctx, $p) => {
       }, (e, r, body) => {
         if(r && r.statusCode < 201){
           $p.wsql.set_user_param('user_name', _auth.username);
-          set_cache(auth_str, true);
+          set_cache(auth_str, true, _auth.username);
         }
         else{
           ctx.status = (r && r.statusCode) || 500;
