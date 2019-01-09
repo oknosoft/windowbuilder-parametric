@@ -89,7 +89,7 @@ var auth = async (ctx, $p) => {
     const auth_str = authorization.substr(6);
     try{
       const cached = auth_cache[auth_str];
-      if(cached && (cached.stamp + 30 * 60 * 1000) > Date.now() && cached.username) {
+      if(cached && cached.username && (cached.stamp + 30 * 60 * 1000) > Date.now()) {
         _auth.username = cached.username;
         _auth.suffix = cached.suffix;
         return resolve(cached.auth);

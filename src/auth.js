@@ -36,7 +36,7 @@ export default async (ctx, $p) => {
     try{
       // получаем строку из заголовка авторизации
       const cached = auth_cache[auth_str];
-      if(cached && (cached.stamp + 30 * 60 * 1000) > Date.now() && cached.username) {
+      if(cached && cached.username && (cached.stamp + 30 * 60 * 1000) > Date.now()) {
         _auth.username = cached.username;
         _auth.suffix = cached.suffix;
         return resolve(cached.auth);
