@@ -27,7 +27,7 @@ export default async (ctx, $p) => {
   const resp = await new Promise((resolve, reject) => {
 
     function set_cache(key, auth, username, suffix) {
-      auth_cache[key] = {stamp: Date.now(), auth, username};
+      auth_cache[key] = {stamp: Date.now(), auth, username, suffix};
       resolve(auth);
     }
 
