@@ -82,7 +82,7 @@ var auth = async (ctx, $p) => {
   const {couch_local, zone} = $p.job_prm;
   const _auth = {'username':''};
   const resp = await new Promise((resolve, reject) => {
-    function set_cache(key, auth, username) {
+    function set_cache(key, auth, username, suffix) {
       auth_cache[key] = {stamp: Date.now(), auth, username};
       resolve(auth);
     }
@@ -91,6 +91,7 @@ var auth = async (ctx, $p) => {
       const cached = auth_cache[auth_str];
       if(cached && (cached.stamp + 30 * 60 * 1000) > Date.now() && cached.username) {
         _auth.username = cached.username;
+        _auth.suffix = cached.suffix;
         return resolve(cached.auth);
       }
       const auth = new Buffer(auth_str, 'base64').toString();
@@ -107,7 +108,7 @@ var auth = async (ctx, $p) => {
       }, (e, r, body) => {
         if(r && r.statusCode < 201){
           $p.wsql.set_user_param('user_name', _auth.username);
-          set_cache(auth_str, true, _auth.username);
+          set_cache(auth_str, true, _auth.username, _auth.suffix);
         }
         else{
           ctx.status = (r && r.statusCode) || 500;
