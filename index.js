@@ -1,5 +1,5 @@
 /*!
- windowbuilder-parametric v2.0.241, built:2019-01-09
+ windowbuilder-parametric v2.0.241, built:2019-01-10
  © 2014-2018 Evgeniy Malyarov and the Oknosoft team http://www.oknosoft.ru
  To obtain commercial license and technical support, contact info@oknosoft.ru
  */
@@ -64,7 +64,6 @@ $p.wsql.init(settings);
   });
 })();
 
-const auth_cache = {};
 var auth = async (ctx, $p) => {
   const {restrict_ips} = ctx.app;
   const ip = ctx.req.headers['x-real-ip'] || ctx.ip;
@@ -83,17 +82,10 @@ var auth = async (ctx, $p) => {
   const _auth = {'username':''};
   const resp = await new Promise((resolve, reject) => {
     function set_cache(key, auth, username, suffix) {
-      auth_cache[key] = {stamp: Date.now(), auth, username, suffix};
       resolve(auth);
     }
     const auth_str = authorization.substr(6);
     try{
-      const cached = auth_cache[auth_str];
-      if(cached && cached.username && (cached.stamp + 30 * 60 * 1000) > Date.now()) {
-        _auth.username = cached.username;
-        _auth.suffix = cached.suffix;
-        return resolve(cached.auth);
-      }
       const auth = new Buffer(auth_str, 'base64').toString();
       const sep = auth.indexOf(':');
       _auth.pass = auth.substr(sep + 1);
@@ -120,7 +112,6 @@ var auth = async (ctx, $p) => {
     catch(e){
       ctx.status = 500;
       ctx.body = e.message;
-      delete auth_cache[auth_str];
       resolve(false);
     }
   });

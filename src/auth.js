@@ -35,12 +35,12 @@ export default async (ctx, $p) => {
 
     try{
       // получаем строку из заголовка авторизации
-      const cached = auth_cache[auth_str];
-      if(cached && cached.username && (cached.stamp + 30 * 60 * 1000) > Date.now()) {
-        _auth.username = cached.username;
-        _auth.suffix = cached.suffix;
-        return resolve(cached.auth);
-      }
+      // const cached = auth_cache[auth_str];
+      // if(cached && cached.username && (cached.stamp + 30 * 60 * 1000) > Date.now()) {
+      //   _auth.username = cached.username;
+      //   _auth.suffix = cached.suffix;
+      //   return resolve(cached.auth);
+      // }
 
       const auth = new Buffer(auth_str, 'base64').toString();
       const sep = auth.indexOf(':');
