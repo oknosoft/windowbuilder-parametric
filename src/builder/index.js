@@ -1,10 +1,13 @@
 'use strict';
 
 import paper from 'paper/dist/paper-core';
+import drawer from 'windowbuilder/public/dist/drawer';
 import $p from '../metadata';
 
 global.paper = paper;
-const EditorInvisible = require('./src/builder/drawer');
+// формируем в $p конструктор стандартной рисовалки
+drawer({$p, paper});
+const {EditorInvisible} = $p;
 
 const debug = require('debug')('wb:paper');
 debug('required, inited & modified');

@@ -1,6 +1,6 @@
 /*!
- windowbuilder-parametric v2.0.241, built:2019-01-10
- © 2014-2018 Evgeniy Malyarov and the Oknosoft team http://www.oknosoft.ru
+ windowbuilder-parametric v2.0.249, built:2019-12-01
+ © 2014-2019 Evgeniy Malyarov and the Oknosoft team http://www.oknosoft.ru
  To obtain commercial license and technical support, contact info@oknosoft.ru
  */
 
@@ -15,12 +15,13 @@ var metaCore = _interopDefault(require('metadata-core'));
 var metaPouchdb = _interopDefault(require('metadata-pouchdb'));
 var request = _interopDefault(require('request'));
 var paper = _interopDefault(require('paper/dist/paper-core'));
+var drawer = _interopDefault(require('windowbuilder/public/dist/drawer'));
 var Router = _interopDefault(require('koa-better-router'));
 
 const debug = require('debug')('wb:meta');
 const MetaEngine = metaCore.plugin(metaPouchdb);
 const settings = require('./config/report.settings');
-const meta_init = require('./src/metadata/init.js');
+const meta_init = require('windowbuilder/public/dist/init');
 debug('required');
 const $p = global.$p = new MetaEngine();
 debug('created');
@@ -194,7 +195,8 @@ var log = async (ctx, next) => {
 };
 
 global.paper = paper;
-const EditorInvisible = require('./src/builder/drawer');
+drawer({$p, paper});
+const {EditorInvisible} = $p;
 const debug$1 = require('debug')('wb:paper');
 debug$1('required, inited & modified');
 class Editor extends EditorInvisible {
