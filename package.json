@@ -22,12 +22,12 @@
     "koa": "^2.11.0",
     "koa-better-router": "^2.1",
     "md5-file": "^4.0",
-    "metadata-abstract-ui": "2.0.21-beta.5",
-    "metadata-core": "2.0.21-beta.5",
-    "metadata-pouchdb": "2.0.21-beta.5",
+    "metadata-abstract-ui": "2.0.22-beta.1",
+    "metadata-core": "2.0.22-beta.1",
+    "metadata-pouchdb": "2.0.22-beta.1",
     "paper-jsdom-canvas": "^0.12.4",
     "request": "^2.88.0",
-    "windowbuilder": "github:oknosoft/windowbuilder#2570c96d52f310f45337fa75640eaeb6ff235941"
+    "windowbuilder": "github:oknosoft/windowbuilder#b0789ff24cc035016e6407e2e0c47ee310449c39"
   },
   "devDependencies": {
     "eslint": "^5.16.0",
