@@ -10,7 +10,7 @@ const MetaEngine = metaCore.plugin(metaPouchdb);
 const settings = require('./config/report.settings');
 
 // функция инициализации структуры метаданных
-const meta_init = require('windowbuilder/public/dist/init');
+const meta_init = require('windowbuilder/dist/init');
 
 debug('required');
 

@@ -27,7 +27,7 @@
     "metadata-pouchdb": "2.0.22-beta.1",
     "paper-jsdom-canvas": "^0.12.4",
     "request": "^2.88.0",
-    "windowbuilder": "github:oknosoft/windowbuilder#b0789ff24cc035016e6407e2e0c47ee310449c39"
+    "windowbuilder": "github:oknosoft/windowbuilder-core#695c2a11f46af0084335bc28d70883606511dff3"
   },
   "devDependencies": {
     "eslint": "^5.16.0",
