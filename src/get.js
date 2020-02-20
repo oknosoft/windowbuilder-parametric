@@ -104,6 +104,7 @@ async function cat(ctx, next) {
 
   const predefined_names = ['БезЦвета', 'Белый'];
   const {clrs, inserts, nom, partners, users} = $p.cat;
+  const prms = new Set();
   const res = {
     // цвета
     clrs: clrs.alatable
@@ -114,15 +115,47 @@ async function cat(ctx, next) {
         name: o.name,
       })),
     // номенклатура и вставки
-    nom: inserts.alatable.filter((o) => o.ref !== $p.utils.blank.guid).map((o) => ({
-      ref: o.ref,
-      id: o.id,
-      name: o.name,
-      article: o.article || '',
-    })),
+    nom: inserts.alatable.filter((o) => o.ref !== $p.utils.blank.guid).map((o) => {
+      const mf = {};
+      clrs.selection_exclude_service(mf, o);
+      const {path} = mf.choice_params[1];
+      const params = new Set();
+      for (const ts of ['selection_params', 'product_params']) {
+        o[ts].forEach(({param}) => {
+          if(!param.empty()) {
+            params.add(param);
+          }
+        });
+      }
+      for (const param of params) {
+        prms.add(param);
+      }
+
+      return {
+        ref: o.ref,
+        id: o.id,
+        name: o.name,
+        article: o.article || '',
+        available: oavailable,
+        lmin: o.lmin,
+        lmax: o.lmax,
+        hmin: o.hmin,
+        hmax: o.hmax,
+        smin: o.smin,
+        smax: o.smax,
+        mmin: o.mmin,
+        mmax: o.mmax,
+        clr_group: path.in ? path.in : [],
+        params: Array.from(params).map(v => v.ref),
+      };
+    }),
     // контрагенты
     partners: [],
   };
+
+  // подклеиваем параметры
+  res.prms = Array.from(prms).map(({ref, name, mandatory}) => ({ref, name, mandatory}));
+  res.prm_values = [];
 
   // подклеиваем контрагентов
   for(let o of _auth.user._obj.acl_objs.filter((o) => o.type == 'cat.partners')){
