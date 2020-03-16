@@ -1,9 +1,8 @@
-
-import request from 'request';
+const fetch = require('node-fetch');
 
 const auth_cache = {};
 
-export default async (ctx, $p) => {
+module.exports = async (ctx, $p) => {
 
   // если указано ограничение по ip - проверяем
   const {restrict_ips} = ctx.app;
@@ -24,7 +23,7 @@ export default async (ctx, $p) => {
 
   const {couch_local, zone} = $p.job_prm;
   const _auth = {'username':''};
-  const resp = await new Promise((resolve, reject) => {
+  const resp = await new Promise(async (resolve, reject) => {
 
     function set_cache(key, auth, username, suffix) {
       auth_cache[key] = {stamp: Date.now(), auth, username, suffix};
@@ -53,20 +52,17 @@ export default async (ctx, $p) => {
 
       _auth.suffix = suffix;
 
-      request({
-        url: couch_local + zone + '_doc_' + suffix,
-        auth: {'user':_auth.username, 'pass':_auth.pass, sendImmediately: true}
-      }, (e, r, body) => {
-        if(r && r.statusCode < 201){
+      await fetch(`${couch_local}${zone}_doc_${suffix}`, {headers: {authorization}})
+        .then((res) => res.json())
+        .then((info) => {
           $p.wsql.set_user_param('user_name', _auth.username);
           set_cache(auth_str, true, _auth.username, _auth.suffix);
-        }
-        else{
-          ctx.status = (r && r.statusCode) || 500;
-          ctx.body = body || (e && e.message);
+        })
+        .catch((err) => {
+          ctx.status = 403;
+          ctx.body = err.message;
           set_cache(auth_str, false);
-        }
-      });
+        });
     }
     catch(e){
       ctx.status = 500;

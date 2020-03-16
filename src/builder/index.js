@@ -1,9 +1,9 @@
 'use strict';
 
-import paper from 'paper/dist/paper-core';
-import drawer from 'windowbuilder/dist/drawer';
-import $p from '../metadata';
+const paper = require('paper/dist/paper-core');
+const $p = require('../metadata');
 
+const drawer = require('windowbuilder/dist/drawer');
 global.paper = paper;
 // формируем в $p конструктор стандартной рисовалки
 drawer({$p, paper});
@@ -44,4 +44,4 @@ class Editor extends EditorInvisible {
 }
 $p.Editor = Editor;
 
-export default EditorInvisible;
+module.exports = EditorInvisible;

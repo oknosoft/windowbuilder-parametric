@@ -1,11 +1,12 @@
 'use strict';
 
-import $p from './metadata';
+const $p = require('./metadata');
 
 const debug = require('debug')('wb:get');
 debug('required');
 
-export function serialize_prod({o, prod, ctx}) {
+
+function serialize_prod({o, prod, ctx}) {
   const flds = ['margin', 'price_internal', 'amount_internal', 'marginality', 'first_cost', 'discount', 'discount_percent',
     'discount_percent_internal', 'changed', 'ordn', 'characteristic', 'qty'];
   // человекочитаемая информация в табчасть продукции
@@ -115,40 +116,42 @@ async function cat(ctx, next) {
         name: o.name,
       })),
     // номенклатура и вставки
-    nom: inserts.alatable.filter((o) => o.ref !== $p.utils.blank.guid).map((o) => {
-      const mf = {};
-      clrs.selection_exclude_service(mf, o);
-      const {path} = mf.choice_params[1];
-      const params = new Set();
-      for (const ts of ['selection_params', 'product_params']) {
-        o[ts].forEach(({param}) => {
-          if(!param.empty()) {
-            params.add(param);
-          }
-        });
-      }
-      for (const param of params) {
-        prms.add(param);
-      }
-
-      return {
-        ref: o.ref,
-        id: o.id,
-        name: o.name,
-        article: o.article || '',
-        available: oavailable,
-        lmin: o.lmin,
-        lmax: o.lmax,
-        hmin: o.hmin,
-        hmax: o.hmax,
-        smin: o.smin,
-        smax: o.smax,
-        mmin: o.mmin,
-        mmax: o.mmax,
-        clr_group: path.in ? path.in : [],
-        params: Array.from(params).map(v => v.ref),
-      };
-    }),
+    nom: inserts.alatable
+      .filter((o) => o.ref !== $p.utils.blank.guid)
+      .map(({ref}) => {
+        const o = inserts.get(ref);
+        const mf = {};
+        clrs.selection_exclude_service(mf, o);
+        const {path} = mf.choice_params[1];
+        const params = new Set();
+        for (const ts of ['selection_params', 'product_params']) {
+          o[ts].forEach(({param}) => {
+            if(!param.empty()) {
+              params.add(param);
+            }
+          });
+        }
+        for (const param of params) {
+          prms.add(param);
+        }
+        return {
+          ref: o.ref,
+          id: o.id,
+          name: o.name,
+          article: o.article || '',
+          available: o.available,
+          lmin: o.lmin,
+          lmax: o.lmax,
+          hmin: o.hmin,
+          hmax: o.hmax,
+          smin: o.smin,
+          smax: o.smax,
+          mmin: o.mmin,
+          mmax: o.mmax,
+          clr_group: path.in ? path.in : [],
+          params: Array.from(params).map(v => v.ref),
+        };
+      }),
     // контрагенты
     partners: [],
   };
@@ -197,7 +200,7 @@ async function array(ctx, next) {
   //ctx.body = res;
 }
 
-export default async (ctx, next) => {
+module.exports = async (ctx, next) => {
 
   try{
     switch (ctx.params.class){
@@ -229,3 +232,5 @@ export default async (ctx, next) => {
   }
 
 };
+
+module.exports.serialize_prod = serialize_prod;

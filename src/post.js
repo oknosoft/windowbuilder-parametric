@@ -1,8 +1,7 @@
 'use strict';
 
-
-import $p from './metadata';
-import {serialize_prod} from './get';
+const $p = require('./metadata');
+const {serialize_prod} = require('./get');
 
 const debug = require('debug')('wb:post');
 debug('required');
@@ -336,9 +335,8 @@ async function docs(ctx, next) {
         keys.push(class_name + "|" + selector._id);
       }
 
-      const res = await pouch.allDocs({'include_docs': true, 'inclusive_end': true, 'keys': keys});
+      ctx.body = await pouch.allDocs({'include_docs': true, 'inclusive_end': true, 'keys': keys});
 
-      ctx.body = res;
     }
     else {
       //Нужен mango query, поэтому пересоберем селектор, чтобы были правильные поля в правильном порядке
@@ -379,7 +377,7 @@ async function docs(ctx, next) {
       //расчет презентаций - кода, номера документа, наименования и т.д. для ссылочных реквизитов
       res.docs.forEach((doc) => {
         representation(doc, md);
-      })
+      });
 
       ctx.body = res;
     }
@@ -407,10 +405,7 @@ function representation(obj, md) {
       new_field._mixin(field_obj, (md_class == 'doc') ? ['number_doc', 'date'] : ['id', 'name'], []);
 
       _obj[field] = new_field;
-
-      return;
     }
-    return;
   }
 
   //реквизиты
@@ -477,7 +472,7 @@ async function load_doc_ram(ctx, next) {
   ctx.body = {'doc_ram_loading_started': true};
 }
 
-export default async (ctx, next) => {
+module.exports = async (ctx, next) => {
 
   try {
     switch (ctx.params.class) {

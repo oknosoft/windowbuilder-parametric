@@ -6,8 +6,8 @@
  * Created by Evgeniy Malyarov on 23.09.2017.
  */
 
-import $p from './metadata';
-import auth from './auth';
+const $p = require('./metadata');
+const auth = require('./auth');
 
 const sessions = {};
 
@@ -43,10 +43,11 @@ async function saveLog({_id, log, start, body}) {
       rev.rows.push(log);
       return doc.put(rev);
     }
-  });
+  })
+    .catch(() => null);
 }
 
-export default async (ctx, next) => {
+module.exports = async (ctx, next) => {
 
   // request
   const {moment} = $p.utils;
@@ -70,10 +71,10 @@ export default async (ctx, next) => {
 
       // проверяем и устанавливаем сессию
       const {suffix} = ctx._auth;
-      if(sessions.hasOwnProperty(suffix) && Date.now() - sessions[suffix] < 10000) {
+      if(sessions.hasOwnProperty(suffix) && Date.now() - sessions[suffix] < 6000) {
         ctx.status = 403;
         log.error = ctx.body = 'flood: concurrent requests';
-        saveLog({_id, log, start, body: ctx.body});
+        await saveLog({_id, log, start, body: ctx.body});
       }
       else {
         sessions[suffix] = Date.now();
@@ -84,7 +85,7 @@ export default async (ctx, next) => {
         // передаём управление основной задаче
         await next();
         // по завершению, записываем лог
-        saveLog({_id, log, start, body: log.url.indexOf('prm/doc.calc_order') != -1 && ctx.body});
+        await saveLog({_id, log, start, body: log.url.indexOf('prm/doc.calc_order') != -1 && ctx.body});
 
         // сбрасываем сессию
         sessions[suffix] = 0;
@@ -94,14 +95,14 @@ export default async (ctx, next) => {
     catch (err) {
       // в случае ошибки, так же, записываем лог
       log.error = err.message;
-      saveLog({_id, log, start});
+      await saveLog({_id, log, start});
       throw err;
     }
   }
   else{
     // для неавторизованных пользователей записываем лог
     log.error = 'unauthorized';
-    saveLog({_id, log, start, body: ctx.body});
+    await saveLog({_id, log, start, body: ctx.body});
   }
 
 };

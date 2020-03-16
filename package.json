@@ -1,18 +1,17 @@
 {
   "name": "windowbuilder-parametric",
   "description": "Parametric orders for windowbuilder project",
-  "version": "2.0.250",
+  "version": "2.0.251",
   "author": "Evgeniy Malyarov <info@oknosoft.ru> (http://www.oknosoft.ru)",
   "license": "SEE LICENSE IN LICENSE.en.md",
-  "main": "index.js",
+  "main": "src/index.js",
   "engines": {
     "node": "^8.8",
     "npm": "^6.0"
   },
   "scripts": {
-    "start": "node ./index",
-    "debug": "node --inspect-brk ./index",
-    "build": "node ./scripts/build",
+    "start": "node ./src/index.js",
+    "debug": "node --inspect-brk ./src/index.js",
     "canvas": "apt-get install libcairo2-dev libjpeg62-turbo-dev libpango1.0-dev libgif-dev build-essential g++",
     "meta:link": "node ./scripts/meta.link"
   },
@@ -22,18 +21,18 @@
     "koa": "^2.11.0",
     "koa-better-router": "^2.1",
     "md5-file": "^4.0",
-    "metadata-abstract-ui": "2.0.22-beta.3",
-    "metadata-core": "2.0.22-beta.3",
-    "metadata-pouchdb": "2.0.22-beta.3",
+    "metadata-abstract-ui": "2.0.22-beta.4",
+    "metadata-core": "2.0.22-beta.4",
+    "metadata-pouchdb": "2.0.22-beta.4",
+    "metadata-superlogin": "2.0.22-beta.4",
     "paper-jsdom-canvas": "^0.12.4",
-    "request": "^2.88.2",
-    "windowbuilder": "github:oknosoft/windowbuilder-core#3a4c42345261be02be6e5520331938a55e7669cc"
+    "windowbuilder": "github:oknosoft/windowbuilder-core#7674ee8e80ce5c9d3f55dc009d731aaf09777708"
   },
   "devDependencies": {
     "eslint": "^5.16.0",
     "eslint-config-react-app": "^2.1.0",
     "eslint-plugin-promise": "^3.8.0",
-    "eslint-plugin-react": "^7.18.3",
+    "eslint-plugin-react": "^7.19.0",
     "node-fetch": "^2.6.0",
     "rollup": "^0.68",
     "rollup-plugin-cleanup": "^3.1.1",

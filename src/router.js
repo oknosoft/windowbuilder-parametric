@@ -3,16 +3,16 @@
 const debug = require('debug')('wb:router');
 debug('start');
 
-import './builder';
+require('./builder');
 
-import Router from 'koa-better-router';
+const Router = require('koa-better-router');
 const router = Router({ prefix: '/prm' });
 
-import get from './get';
-import post from './post';
+const get = require('./get');
+const post = require('./post');
 
 router.loadMethods()
   .get('/:class/:ref', get)
   .post('/:class/:ref', post);
 
-export default router;
+module.exports = router;

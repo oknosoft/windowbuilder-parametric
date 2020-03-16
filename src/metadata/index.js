@@ -2,12 +2,14 @@
 const debug = require('debug')('wb:meta');
 
 // конструктор MetaEngine
-import metaCore from 'metadata-core';
-import metaPouchdb from 'metadata-pouchdb';
+const metaCore = require('metadata-core');
+const metaPouchdb = require('metadata-pouchdb');
 const MetaEngine = metaCore.plugin(metaPouchdb);
 
+const auth_header = require('metadata-superlogin/proxy/auth_header');
+
 // функция установки параметров сеанса
-const settings = require('./config/report.settings');
+const settings = require('../../config/report.settings');
 
 // функция инициализации структуры метаданных
 const meta_init = require('windowbuilder/dist/init');
@@ -31,7 +33,8 @@ $p.wsql.init(settings);
   meta_init($p);
 
   // сообщяем адаптерам пути, суффиксы и префиксы
-  const {wsql, job_prm, adapters: {pouch}} = $p;
+  const {wsql, job_prm, adapters: {pouch}, classes} = $p;
+  classes.PouchDB.plugin(auth_header);
   pouch.init(wsql, job_prm);
 
   // // подключим модификаторы
@@ -75,7 +78,7 @@ $p.wsql.init(settings);
 
 })();
 
-export default $p;
+module.exports = $p;
 
 
 
