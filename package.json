@@ -1,7 +1,7 @@
 {
   "name": "windowbuilder-parametric",
   "description": "Parametric orders for windowbuilder project",
-  "version": "2.0.251",
+  "version": "2.0.252",
   "author": "Evgeniy Malyarov <info@oknosoft.ru> (http://www.oknosoft.ru)",
   "license": "SEE LICENSE IN LICENSE.en.md",
   "main": "src/index.js",
@@ -21,12 +21,12 @@
     "koa": "^2.11.0",
     "koa-better-router": "^2.1",
     "md5-file": "^4.0",
-    "metadata-abstract-ui": "2.0.22-beta.4",
-    "metadata-core": "2.0.22-beta.4",
-    "metadata-pouchdb": "2.0.22-beta.4",
-    "metadata-superlogin": "2.0.22-beta.4",
+    "metadata-abstract-ui": "2.0.22-beta.5",
+    "metadata-core": "2.0.22-beta.5",
+    "metadata-pouchdb": "2.0.22-beta.5",
+    "metadata-superlogin": "2.0.22-beta.5",
     "paper-jsdom-canvas": "^0.12.4",
-    "windowbuilder": "github:oknosoft/windowbuilder-core#7674ee8e80ce5c9d3f55dc009d731aaf09777708"
+    "windowbuilder": "github:oknosoft/windowbuilder-core#caee4d2f9c45741355c09305fae1a781da81d291"
   },
   "devDependencies": {
     "eslint": "^5.16.0",
