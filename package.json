@@ -20,13 +20,13 @@
     "canvas-prebuilt": "^1.6.11",
     "koa": "^2.11.0",
     "koa-better-router": "^2.1",
-    "md5-file": "^5.0",
-    "metadata-abstract-ui": "2.0.22-beta.6",
-    "metadata-core": "2.0.22-beta.6",
-    "metadata-pouchdb": "2.0.22-beta.6",
-    "metadata-superlogin": "2.0.22-beta.6",
+    "md5-file": "^4.0",
+    "metadata-abstract-ui": "2.0.22-beta.7",
+    "metadata-core": "2.0.22-beta.7",
+    "metadata-pouchdb": "2.0.22-beta.7",
+    "metadata-superlogin": "2.0.22-beta.7",
     "paper-jsdom-canvas": "^0.12.4",
-    "windowbuilder": "github:oknosoft/windowbuilder-core#bec6c468dfe287f37edbb7e2a046fff2925abdbd"
+    "windowbuilder": "github:oknosoft/windowbuilder-core#afc194466439700f652a5ca505a4d6a4c8738764"
   },
   "devDependencies": {
     "eslint": "^5.16.0",
