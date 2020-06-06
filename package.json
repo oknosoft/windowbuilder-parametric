@@ -6,8 +6,8 @@
   "license": "SEE LICENSE IN LICENSE.en.md",
   "main": "src/index.js",
   "engines": {
-    "node": "^8.8",
-    "npm": "^6.0"
+    "node": "^12.18",
+    "npm": "^6.14"
   },
   "scripts": {
     "start": "node ./src/index.js",
@@ -17,22 +17,18 @@
   },
   "dependencies": {
     "@koa/cors": "^2.2.3",
-    "canvas-prebuilt": "^1.6.11",
-    "koa": "^2.11.0",
+    "canvas": "^2.6.1",
+    "koa": "^2.12.0",
     "koa-better-router": "^2.1",
-    "md5-file": "^4.0",
     "metadata-abstract-ui": "2.0.22-beta.7",
     "metadata-core": "2.0.22-beta.7",
     "metadata-pouchdb": "2.0.22-beta.7",
     "metadata-superlogin": "2.0.22-beta.7",
-    "paper-jsdom-canvas": "^0.12.4",
-    "windowbuilder": "github:oknosoft/windowbuilder-core#afc194466439700f652a5ca505a4d6a4c8738764"
+    "paper-jsdom-canvas": "^0.12.8",
+    "windowbuilder": "github:oknosoft/windowbuilder-core#5ff3ec794103eb8a4b271d6b4ed5e11058a0310c"
   },
   "devDependencies": {
-    "eslint": "^5.16.0",
-    "eslint-config-react-app": "^2.1.0",
-    "eslint-plugin-promise": "^3.8.0",
-    "eslint-plugin-react": "^7.19.0",
+    "md5-file": "^5.0",
     "node-fetch": "^2.6.0"
   },
   "homepage": "http://www.oknosoft.ru/zd/",
