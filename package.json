@@ -18,14 +18,14 @@
   "dependencies": {
     "@koa/cors": "^2.2.3",
     "canvas": "^2.6.1",
-    "koa": "^2.12.0",
+    "koa": "^2.12.1",
     "koa-better-router": "^2.1",
     "metadata-abstract-ui": "2.0.22-beta.7",
     "metadata-core": "2.0.22-beta.7",
     "metadata-pouchdb": "2.0.22-beta.7",
     "metadata-superlogin": "2.0.22-beta.7",
     "paper-jsdom-canvas": "^0.12.8",
-    "windowbuilder": "github:oknosoft/windowbuilder-core#5ff3ec794103eb8a4b271d6b4ed5e11058a0310c"
+    "windowbuilder": "github:oknosoft/windowbuilder-core#ada96045e23a35513b37ca02cb29b8047ac4594d"
   },
   "devDependencies": {
     "md5-file": "^5.0",
