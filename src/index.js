@@ -1,21 +1,19 @@
-'use strict';
 
-const Koa = require('koa');
-const app = new Koa();
+// app.restrict_ips = process.env.IPS ? process.env.IPS.split(',') : [];
 
-// Register the cors as Koa middleware
-const cors = require('@koa/cors');
-app.use(cors({credentials: true, maxAge: 600}));
+module.exports = function reports($p, log) {
 
-// Register the logger as Koa middleware
-const log = require('./log');
-app.use(log);
+  const rget  = require('./get')($p, log);
+  const rpost = require('./post')($p, log);
+  const rlog  = require('./log')($p, log);
 
-// Register the router as Koa middleware
-const router = require('./router');
-app.use(router.middleware());
+  return async function reportsHandler(req, res) {
+    const {query, path, paths} = req.parsed;
 
-app.listen(process.env.PORT || 3000);
-app.restrict_ips = process.env.IPS ? process.env.IPS.split(',') : [];
+    if (req.method === 'POST') {
+      return rpost(req, res);
+    }
 
-module.exports = app;
+  }
+}
+

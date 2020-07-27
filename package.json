@@ -1,36 +1,18 @@
 {
   "name": "windowbuilder-parametric",
   "description": "Parametric orders for windowbuilder project",
-  "version": "2.0.253",
+  "version": "2.0.254",
   "author": "Evgeniy Malyarov <info@oknosoft.ru> (http://www.oknosoft.ru)",
   "license": "SEE LICENSE IN LICENSE.en.md",
-  "main": "src/index.js",
   "engines": {
     "node": "^12.18",
     "npm": "^6.14"
   },
   "scripts": {
-    "start": "node ./src/index.js",
-    "debug": "node --inspect-brk ./src/index.js",
-    "canvas": "apt-get install libcairo2-dev libjpeg62-turbo-dev libpango1.0-dev libgif-dev build-essential g++",
-    "meta:link": "node ./scripts/meta.link"
+    "canvas": "apt-get install libcairo2-dev libjpeg62-turbo-dev libpango1.0-dev libgif-dev build-essential g++"
   },
-  "dependencies": {
-    "@koa/cors": "^3.1",
-    "canvas": "^2.6.1",
-    "koa": "^2.13",
-    "koa-better-router": "^2.1",
-    "metadata-abstract-ui": "2.0.23-beta.2",
-    "metadata-core": "2.0.23-beta.2",
-    "metadata-pouchdb": "2.0.23-beta.2",
-    "metadata-superlogin": "2.0.23-beta.2",
-    "paper-jsdom-canvas": "0.12.8",
-    "windowbuilder": "github:oknosoft/windowbuilder-core#22a99a2eb8e8f6df1493ff573aca4e84ef02d5f1"
-  },
-  "devDependencies": {
-    "md5-file": "^5.0",
-    "node-fetch": "^2.6.0"
-  },
+  "dependencies": {},
+  "devDependencies": {},
   "homepage": "http://www.oknosoft.ru/zd/",
   "repository": {
     "type": "git",
