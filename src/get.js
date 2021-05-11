@@ -1,13 +1,15 @@
 
-module.exports = function prm_get($p, log) {
+module.exports = function prm_get($p, log, rlog) {
+
+  const {cat, utils, job_prm, adapters: {pouch}} = $p;
 
   function serialize_prod({o, prod, ctx}) {
     const flds = ['margin', 'price_internal', 'amount_internal', 'marginality', 'first_cost', 'discount', 'discount_percent',
       'discount_percent_internal', 'changed', 'ordn', 'characteristic', 'qty'];
     // человекочитаемая информация в табчасть продукции
     for(let row of o._obj.production){
-      const ox = $p.cat.characteristics.get(row.characteristic);
-      const nom = $p.cat.nom.get(row.nom);
+      const ox = cat.characteristics.get(row.characteristic);
+      const nom = cat.nom.get(row.nom);
       if(ox){
         row.clr = ox.clr ? ox.clr.ref : '';
         row.clr_name = ox.clr ? ox.clr.name : '';
@@ -20,7 +22,7 @@ module.exports = function prm_get($p, log) {
       }
       row.vat_rate = row.vat_rate.valueOf();
       row.nom_name = nom.toString();
-      row.unit_name = $p.cat.nom_units.get(row.unit).toString();
+      row.unit_name = cat.nom_units.get(row.unit).toString();
       row.product_name = ox ? ox.toString() : '';
       for (let fld of flds) {
         delete row[fld];
@@ -30,7 +32,7 @@ module.exports = function prm_get($p, log) {
       }
     }
     // человекочитаемая информация в табчасть допреквизитов
-    const {properties} = $p.job_prm;
+    const {properties} = job_prm;
     o.extra_fields.forEach(({property, _obj}) => {
       let finded;
       for(const prop in properties){
@@ -77,33 +79,34 @@ module.exports = function prm_get($p, log) {
     o.unload();
   }
 
-  async function store(ctx, next) {
+  async function store(req, res) {
     // данные авторизации получаем из контекста
-    const {_auth, params} = ctx;
-    const ref = (params.ref || '').toLowerCase();
-    const _id = `_local/store.${_auth.suffix}.${ref || 'mapping'}`;
-    ctx.body = await $p.adapters.pouch.remote.doc.get(_id)
+    const {parsed: {paths}, user} = req;
+    const ref = (paths[2] || '').toLowerCase();
+    const suffix = user.branch.suffix || '0000';
+    const _id = `_local/store.${suffix}.${ref || 'mapping'}`;
+    const result = await pouch.remote.doc.get(_id)
       .catch((err) => ({error: true, message: `Объект ${_id} не найден\n${err.message}`}));
+    res.end(JSON.stringify(result));
   }
 
-  async function log(ctx, next) {
-    // данные авторизации получаем из контекста
-    const {_auth, params} = ctx;
-    const ref = (params.ref || '').toLowerCase();
-    const _id = `_local/log.${_auth.suffix}.${ref}`;
-    ctx.body = await $p.adapters.pouch.remote.doc.get(_id)
+
+  async function get_log(req, res) {
+    const {parsed: {paths}, user} = req;
+    const ref = (paths[2] || '').toLowerCase();
+    const suffix = user.branch.suffix || '0000';
+    const _id = `_local/log.${suffix}.${ref}`;
+    const result = await pouch.remote.doc.get(_id)
       .catch((err) => ({error: true, message: `Объект ${_id} не найден\n${err.message}`}));
+    res.end(JSON.stringify(result));
   }
 
-  async function cat(ctx, next) {
-
-    // данные авторизации получаем из контекста
-    const {_auth} = ctx;
+  async function catalogs(req, res) {
 
     const predefined_names = ['БезЦвета', 'Белый'];
-    const {clrs, inserts, nom, partners, users} = $p.cat;
+    const {clrs, inserts, nom, partners, users} = cat;
     const prms = new Set();
-    const res = {
+    const result = {
       // цвета
       clrs: clrs.alatable
         .filter((o) => !o.is_folder && (!o.predefined_name || predefined_names.indexOf(o.predefined_name) != -1))
@@ -154,13 +157,13 @@ module.exports = function prm_get($p, log) {
     };
 
     // подклеиваем параметры
-    res.prms = Array.from(prms).map(({ref, name, mandatory}) => ({ref, name, mandatory}));
-    res.prm_values = [];
+    result.prms = Array.from(prms).map(({ref, name, mandatory}) => ({ref, name, mandatory}));
+    result.prm_values = [];
 
     // подклеиваем контрагентов
-    for(let o of _auth.user._obj.acl_objs.filter((o) => o.type == 'cat.partners')){
+    for(let o of req.user._obj.acl_objs.filter((o) => o.type == 'cat.partners')){
       const p = await partners.get(o.acl_obj, 'promise');
-      res.partners.push({
+      result.partners.push({
         ref: p.ref,
         id: p.id,
         name: p.name,
@@ -169,14 +172,14 @@ module.exports = function prm_get($p, log) {
     }
 
     // подклеиваем номенклатуру
-    const {outer} = $p.job_prm.nom;
+    const {outer} = job_prm.nom;
     nom.forEach((o) => {
       if(o.is_folder || o.empty()){
         return;
       }
       for(let inom of outer){
         if(o._hierarchy(inom)){
-          res.nom.push({
+          result.nom.push({
             ref: o.ref,
             id: o.id,
             name: o.name,
@@ -187,7 +190,7 @@ module.exports = function prm_get($p, log) {
       }
     });
 
-    ctx.body = res;
+    res.end(JSON.stringify(result));
   }
 
   // формирует json описания продукций массива заказов
@@ -197,35 +200,23 @@ module.exports = function prm_get($p, log) {
     //ctx.body = res;
   }
 
-  return async (ctx, next) => {
+  return async ({req, res}) => {
 
-    try{
-      switch (ctx.params.class){
-      case 'doc.calc_order':
-        return await calc_order(ctx, next);
-      case 'cat':
-        return await cat(ctx, next);
-      case 'store':
-        return await store(ctx, next);
-      case 'log':
-        return await log(ctx, next);
-      case 'array':
-        return await array(ctx, next);
-      default:
-        ctx.status = 404;
-        ctx.body = {
-          error: true,
-          message: `Неизвестный класс ${ctx.params.class}`,
-        };
-      }
-    }
-    catch(err){
-      ctx.status = 500;
-      ctx.body = {
-        error: true,
-        message: err.stack || err.message,
-      };
-      debug(err);
+    const {path, paths} = req.parsed;
+
+    switch (paths[1]){
+    case 'doc.calc_order':
+      return await calc_order(req, res);
+    case 'cat':
+      return await catalogs(req, res);
+    case 'store':
+      return await store(req, res);
+    case 'log':
+      return await get_log(req, res);
+    case 'array':
+      return await array(req, res);
+    default:
+      utils.end.end404(res, path);
     }
 
   };

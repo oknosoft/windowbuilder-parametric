@@ -1,5 +1,7 @@
 
-module.exports = function prm_post($p, log) {
+module.exports = function prm_post($p, log, rlog) {
+
+  const {cat, utils, job_prm} = $p;
 
   // формирует json описания продукции заказа
   async function calc_order(ctx, next) {
@@ -7,7 +9,7 @@ module.exports = function prm_post($p, log) {
     const {_query, params} = ctx;
     const ref = (params.ref || '').toLowerCase();
     const res = {ref, production: []};
-    const {cat, doc, utils, job_prm} = $p;
+    const {doc} = $p;
     const {contracts, nom, inserts, clrs} = cat;
 
     try {
@@ -164,7 +166,7 @@ module.exports = function prm_post($p, log) {
     }
 
     try {
-      const {adapters: {pouch}, utils, job_prm} = $p;
+      const {adapters: {pouch}} = $p;
       const {delivery_order, delivery_date, delivery_time} = job_prm.properties;
       const props = {delivery_order, delivery_date, delivery_time};
       const orders = [];
@@ -460,47 +462,26 @@ module.exports = function prm_post($p, log) {
     ctx.body = res;
   }
 
-  //Запускает загрузку данных из doc
-  async function load_doc_ram(ctx, next) {
-    $p.adapters.pouch.load_doc_ram();
-    ctx.body = {'doc_ram_loading_started': true};
-  }
-
   return async (ctx, next) => {
 
-    try {
-      switch (ctx.params.class) {
-      case 'doc.calc_order':
-        return await calc_order(ctx, next);
-      case 'array':
-        return await array(ctx, next);
-      case 'delivery':
-        return await delivery(ctx, next);
-      case 'store':
-        return await store(ctx, next);
-      case 'docs':
-        return await docs(ctx, next);
-      case 'load_doc_ram':
-        return load_doc_ram(ctx, next);
-      default:
-        if(/(doc|cat|cch)\./.test(ctx.params.class)){
-          return await doc(ctx, next);
-        }
+    const {path, paths} = req.parsed;
 
-        ctx.status = 404;
-        ctx.body = {
-          error: true,
-          message: `Неизвестный класс ${ctx.params.class}`,
-        };
+    switch (paths[1]) {
+    case 'doc.calc_order':
+      return await calc_order(ctx, next);
+    case 'array':
+      return await array(ctx, next);
+    case 'delivery':
+      return await delivery(ctx, next);
+    case 'store':
+      return await store(ctx, next);
+    case 'docs':
+      return await docs(ctx, next);
+    default:
+      if(/(doc|cat|cch)\./.test(ctx.params.class)){
+        return await doc(ctx, next);
       }
-    }
-    catch (err) {
-      ctx.status = 500;
-      ctx.body = {
-        error: true,
-        message: err.stack || err.message,
-      };
-      debug(err);
+      utils.end.end404(res, path);
     }
 
   };

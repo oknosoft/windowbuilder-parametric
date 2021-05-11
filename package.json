@@ -1,15 +1,12 @@
 {
   "name": "windowbuilder-parametric",
   "description": "Parametric orders for windowbuilder project",
-  "version": "2.0.254",
+  "version": "2.0.255",
   "author": "Evgeniy Malyarov <info@oknosoft.ru> (http://www.oknosoft.ru)",
   "license": "SEE LICENSE IN LICENSE.en.md",
   "engines": {
     "node": "^12.18",
     "npm": "^6.14"
-  },
-  "scripts": {
-    "canvas": "apt-get install libcairo2-dev libjpeg62-turbo-dev libpango1.0-dev libgif-dev build-essential g++"
   },
   "dependencies": {},
   "devDependencies": {},
