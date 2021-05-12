@@ -10,6 +10,5 @@ module.exports = function reports($p, log, route = {}) {
   route.prm = function prmHandler(req, res) {
     return rlog(req, res, req.method === 'GET' ? rget : rpost);
   };
-
 };
 
