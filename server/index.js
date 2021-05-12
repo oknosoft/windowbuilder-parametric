@@ -8,8 +8,8 @@ module.exports = function reports($p, log, route = {}) {
   const rpost = require('./post')($p, log);
 
   route.prm = function prmHandler(req, res) {
-    return rlog(req, res, req.method === 'GET' rget : rpost);
+    return rlog(req, res, req.method === 'GET' ? rget : rpost);
   };
 
-}
+};
 

@@ -112,7 +112,7 @@ module.exports = function prm_get($p, log, rlog) {
         .filter((o) => !o.is_folder && (!o.predefined_name || predefined_names.indexOf(o.predefined_name) != -1))
         .map((o) => ({
           ref: o.ref,
-          id: o.id ? o.id.pad(3) : "000",
+          id: o.id ? (o.id.pad ? o.id.pad(3) : o.id) : "000",
           name: o.name,
         })),
       // номенклатура и вставки
@@ -174,7 +174,7 @@ module.exports = function prm_get($p, log, rlog) {
     // подклеиваем номенклатуру
     const {outer} = job_prm.nom;
     nom.forEach((o) => {
-      if(o.is_folder || o.empty()){
+      if(o.is_folder || o.empty() || !outer){
         return;
       }
       for(let inom of outer){
@@ -200,7 +200,7 @@ module.exports = function prm_get($p, log, rlog) {
     //ctx.body = res;
   }
 
-  return async ({req, res}) => {
+  return async (req, res) => {
 
     const {path, paths} = req.parsed;
 

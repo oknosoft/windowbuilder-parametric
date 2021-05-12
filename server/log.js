@@ -41,8 +41,8 @@ module.exports = function prm_log($p, log) {
       start: start.format('HH:mm:ss'),
       url: req.url,
       method: req.method,
-      ip: `${req.headers['x-real-ip'] || remoteAddress}:${remotePort}`,
-      headers: Object.keys(ctx.req.headers).map((key) => [key, ctx.req.headers[key]]),
+      ip: `${req.headers['x-forwarded-for'] || req.headers['x-real-ip'] || remoteAddress}`,
+      headers: Object.keys(req.headers).map((key) => [key, req.headers[key]]),
     };
 
     try {
@@ -62,7 +62,7 @@ module.exports = function prm_log($p, log) {
         await next(req, res);
 
         // по завершению, записываем лог
-        await saveLog({_id, log: log_data, start, body: log.url.indexOf('prm/doc.calc_order') != -1 && req.body});
+        await saveLog({_id, log: log_data, start, body: log_data.url.indexOf('prm/doc.calc_order') != -1 && req.body});
 
         // сбрасываем сессию
         sessions[suffix] = 0;

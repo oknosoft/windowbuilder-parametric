@@ -9,11 +9,11 @@
     "npm": "^6.14"
   },
   "files": [
-    "src/**",
+    "server/**",
     "LICENSE",
     "LICENSE.ru.md"
   ],
-  "main": "src/index.js",
+  "main": "server/index.js",
   "dependencies": {},
   "devDependencies": {},
   "homepage": "http://www.oknosoft.ru/zd/",
