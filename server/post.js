@@ -1,41 +1,37 @@
 
-module.exports = function prm_post($p, log, rlog) {
+module.exports = function prm_post($p, log, serialize_prod) {
 
-  const {cat, utils, job_prm} = $p;
+  const {cat, utils, md, classes: {PouchDB}, job_prm, doc: {calc_order}, dp: {buyers_order}, adapters: {pouch}} = $p;
 
   // формирует json описания продукции заказа
-  async function calc_order(ctx, next) {
+  async function order(req, res) {
 
-    const {_query, params} = ctx;
-    const ref = (params.ref || '').toLowerCase();
-    const res = {ref, production: []};
-    const {doc} = $p;
+    const {parsed: {paths}, body} = req;
+    const ref = (paths[2] || '').toLowerCase();
+    const result = {ref, production: []};
     const {contracts, nom, inserts, clrs} = cat;
 
     try {
-      if(!utils.is_guid(res.ref)){
-        ctx.status = 404;
-        ctx.body = `Параметр запроса ref=${res.ref} не соответствует маске уникального идентификатора`;
+      if(!utils.is_guid(result.ref)){
+        utils.end.end500({res, err: {status: 404, message: `Параметр запроса ref=${result.ref} не соответствует маске уникального идентификатора`}, log});
         return;
       }
 
-      const o = await doc.calc_order.get(res.ref, 'promise');
-      const dp = $p.dp.buyers_order.create();
+      const o = await calc_order.get(ref).load();
+      const dp = buyers_order.create();
       dp.calc_order = o;
 
       let prod;
       if(o.is_new()) {
-        await o.after_create();
+        await o.after_create(req.user);
       }
       else {
         if(o.posted) {
-          ctx.status = 403;
-          ctx.body = `Запрещено изменять проведенный заказ ${res.ref}`;
+          utils.end.end500({res, err: {status: 403, message: `Запрещено изменять проведенный заказ ${result.ref}`}, log});
           return o.unload();
         }
-        if(o.obj_delivery_state == 'Отправлен' && _query.obj_delivery_state != 'Отозван') {
-          ctx.status = 403;
-          ctx.body = `Запрещено изменять отправленный заказ ${res.ref} - его сначала нужно отозвать`;
+        if(o.obj_delivery_state == 'Отправлен' && body.obj_delivery_state != 'Отозван') {
+          utils.end.end500({res, err: {status: 403, message: `Запрещено изменять отправленный заказ ${result.ref} - его сначала нужно отозвать`}, log});
           return o.unload();
         }
         prod = await o.load_production();
@@ -46,22 +42,22 @@ module.exports = function prm_post($p, log, rlog) {
       o._data._loading = true;
 
       // заполняем шапку заказа
-      o.date = utils.moment(_query.date).toDate();
-      o.number_internal = _query.number_doc;
-      if(_query.note){
-        o.note = _query.note;
+      o.date = utils.moment(body.date).toDate();
+      o.number_internal = body.number_doc;
+      if(body.note){
+        o.note = body.note;
       }
       o.obj_delivery_state = 'Черновик';
-      if(_query.partner) {
-        o.partner = _query.partner;
+      if(body.partner) {
+        o.partner = body.partner;
       }
-      if(o.contract.empty() || _query.partner) {
+      if(o.contract.empty() || body.partner) {
         o.contract = contracts.by_partner_and_org(o.partner, o.organization);
       }
       o.vat_consider = o.vat_included = true;
 
       // допреквизиты: бежим структуре входного параметра, если свойства нет в реквизитах, проверяем доп
-      for(const fld in _query) {
+      for(const fld in body) {
         if(o._metadata(fld)){
           continue;
         }
@@ -69,7 +65,7 @@ module.exports = function prm_post($p, log, rlog) {
         if(property && !property.empty()){
           const {type} = property;
           let finded;
-          let value = _query[fld];
+          let value = body[fld];
           if(type.date_part) {
             value = utils.fix_date(value, !type.hasOwnProperty('str_len'));
           }
@@ -91,19 +87,17 @@ module.exports = function prm_post($p, log, rlog) {
       }
 
       // подготавливаем массив продукций
-      for (let row of _query.production) {
+      for (let row of body.production) {
         if(!nom.by_ref[row.nom] || nom.by_ref[row.nom].is_new()) {
           if(!inserts.by_ref[row.nom] || inserts.by_ref[row.nom].is_new()) {
-            ctx.status = 404;
-            ctx.body = `Не найдена номенклатура или вставка ${row.nom}`;
+            utils.end.end500({res, err: {status: 404, message: `Не найдена номенклатура или вставка ${row.nom}`}, log});
             return o.unload();
           }
           row.inset = row.nom;
           delete row.nom;
         }
         if(row.clr && row.clr != utils.blank.guid && !clrs.by_ref[row.clr]) {
-          ctx.status = 404;
-          ctx.body = `Не найден цвет ${row.clr}`;
+          utils.end.end500({res, err: {status: 404, message: `Не найден цвет ${row.clr}`}, log});
           return o.unload();
         }
         const prow = dp.production.add(row);
@@ -112,32 +106,29 @@ module.exports = function prm_post($p, log, rlog) {
       // добавляем строки продукций и материалов
       const ax = await o.process_add_product_list(dp);
       await Promise.all(ax);
-      o.obj_delivery_state = _query.obj_delivery_state == 'Отозван' ? 'Отозван' : (_query.obj_delivery_state == 'Черновик' ? 'Черновик' : 'Отправлен');
+      o.obj_delivery_state = body.obj_delivery_state == 'Отозван' ? 'Отозван' : (body.obj_delivery_state == 'Черновик' ? 'Черновик' : 'Отправлен');
 
       // записываем
       await o.save();
 
       // формируем ответ
-      serialize_prod({o, prod, ctx});
+      serialize_prod({o, prod, res});
       o.unload();
     }
     catch (err) {
-      ctx.status = 500;
-      ctx.body = err ? (err.stack || err.message) : `Ошибка при расчете параметрической спецификации заказа ${res.ref}`;
-      debug(err);
+      utils.end.end500({res, err, log});
     }
 
   }
 
   // формирует json описания продукций массива заказов
-  async function array(ctx, next) {
+  async function array(req, res) {
 
-    ctx.body = `Prefix: ${ctx.route.prefix}, path: ${ctx.route.path}`;
-    //ctx.body = res;
+    res.end(JSON.stringify({ok: true, message: 'method "array" not implemented'}));
   }
 
   // перезаполняет даты и время партий доставки
-  async function delivery(ctx, next) {
+  async function delivery(req, res) {
 
     const {_query, _auth} = ctx;
     if(!Array.isArray(_query)) {
@@ -166,7 +157,6 @@ module.exports = function prm_post($p, log, rlog) {
     }
 
     try {
-      const {adapters: {pouch}} = $p;
       const {delivery_order, delivery_date, delivery_time} = job_prm.properties;
       const props = {delivery_order, delivery_date, delivery_time};
       const orders = [];
@@ -259,79 +249,78 @@ module.exports = function prm_post($p, log, rlog) {
   }
 
   // сохраняет объект в локальном хранилище отдела абонента
-  async function store(ctx, next) {
+  async function store(req, res) {
 
     // данные авторизации получаем из контекста
-    let {_auth, _query} = ctx;
+    let {parsed: {paths}, user, body} = req;
+    const ref = (paths[2] || 'mapping').toLowerCase();
+    const suffix = user.branch.suffix || '0000';
 
-    if(typeof _query == 'object'){
-      const {doc} = $p.adapters.pouch.remote;
-      if(Array.isArray(_query)){
-        _query = {rows: _query};
+    if(typeof body == 'object'){
+      if(Array.isArray(body)){
+        body = {rows: body};
       }
-      _query._id = `_local/store.${_auth.suffix}.${ctx.params.ref || 'mapping'}`;
-      ctx.body = await doc.get(_query._id)
+      body._id = `_local/store.${suffix}.${ref}`;
+      const result = await pouch.remote.doc.get(body._id)
         .catch((err) => null)
         .then((rev) => {
           if(rev){
-            _query._rev = rev._rev
+            body._rev = rev._rev;
           }
-        })
-        .then(() => doc.put(_query));
+          return pouch.remote.doc.put(body);
+        });
+      res.end(JSON.stringify(result));
     }
   }
 
   // возвращает список документов
-  async function docs(ctx, next) {
+  async function docs(req, res) {
 
-    const {_auth, params, _query} = ctx;
-    const {couch_local, zone} = $p.job_prm;
-
-    const {selector} = _query;
+    const {parsed: {paths}, user, headers, body} = req;
+    const {selector} = body;
+    const {couch_local, zone} = job_prm;
 
     //class__name (имя класса) должен быть всегда
-    if (!selector.class_name) {
-      ctx.status = 403;
-      ctx.body = {
-        error: true,
-        message: `Не указан класс объектов в селекторе`,
-      };
-      return;
+    const {class_name} = selector || {};
+    if (!class_name) {
+      return utils.end.end500({res, err: {status: 404, message: `Не указан класс объектов в селекторе`}, log});
     }
 
-    const point = selector.class_name.indexOf('.');
-    const md_class = selector.class_name.substr(0, point);
-    const data_mgr = $p.md.mgr_by_class_name(selector.class_name);
-    const md = data_mgr.metadata();
+    const point = class_name.indexOf('.');
+    const md_class = class_name.substr(0, point);
+    const mgr = md.mgr_by_class_name(class_name);
+    const meta = mgr.metadata();
 
     //Работаем только с данными, кешируемыми в doc, для остального есть отдельный endpoint
-    if(md.cachable == 'doc') {
+    if(meta.cachable == 'doc') {
       //Сразу соединяемся с pouch базы партнера, чтобы брать данные из нее
-      const pouch = new $p.classes.PouchDB(couch_local + zone + '_doc_' + _auth.suffix, {
-        auth: {
-          username: _auth.username,
-          password: _auth.pass
+      const pouch = new PouchDB(couch_local + zone + '_doc_' + _auth.suffix, {
+        fetch (url, opts) {
+          if(!opts.headers) {
+            opts.headers = {};
+          }
+          opts.headers.authorization = headers.authorization;
+          return PouchDB.fetch(url, opts);
         },
         skip_setup: true
       });
 
-      const {class_name} = selector;
-
       //Если в селекторе есть _id, то запрошен перечень конкретных ссылок, и mango query не нужен
+      let result = {docs: []};
       if ('_id' in selector) {
         const keys = [];
 
-
-        if (Array.isArray(selector._id)) {
+        if(Array.isArray(selector._id)) {
           selector._id.forEach((key) => {
-            keys.push(class_name + "|" + key);
-          })
+            keys.push(class_name + '|' + key);
+          });
         }
         else {
-          keys.push(class_name + "|" + selector._id);
+          keys.push(class_name + '|' + selector._id);
         }
 
-        ctx.body = await pouch.allDocs({'include_docs': true, 'inclusive_end': true, 'keys': keys});
+        tmp = await pouch.allDocs({include_docs: true, inclusive_end: true, keys});
+        result.docs = tmp.rows;
 
       }
       else {
@@ -368,34 +357,31 @@ module.exports = function prm_post($p, log, rlog) {
 
         _query.selector = _s;
 
-        const res = await pouch.find(_query);
+        result = await pouch.find(_query);
 
-        //расчет презентаций - кода, номера документа, наименования и т.д. для ссылочных реквизитов
-        res.docs.forEach((doc) => {
-          representation(doc, md);
-        });
-
-        ctx.body = res;
       }
+      pouch.close();
+
     }
-    else {
-      ctx.body = [];
-    }
+    //расчет презентаций - кода, номера документа, наименования и т.д. для ссылочных реквизитов
+    result.docs.forEach((doc) => {
+      representation(doc, meta);
+    });
+    res.end(JSON.stringify(result));
   }
 
   //Функция смотрит на реквизиты объекта, и подменяет ссылки на объекты,
   //содержащие основные данные - код, наименование, номер документа, и саму ссылку
-  function representation(obj, md) {
-    const fake_data_mgr = $p.doc.calc_order;
+  function representation(obj, meta) {
 
     function get_new_field(_obj, field, type) {
-      const data_mgr = fake_data_mgr.value_mgr(_obj, field, type, false, _obj[field]);
+      const mgr = calc_order.value_mgr(_obj, field, type, false, _obj[field]);
 
-      if (data_mgr && (data_mgr.metadata().cachable == 'ram' || data_mgr.metadata().cachable == 'doc_ram')) {
-        const field_obj = data_mgr.get(_obj[field]);
+      if (mgr && (mgr.metadata().cachable == 'ram' || mgr.metadata().cachable == 'doc_ram')) {
+        const field_obj = mgr.get(_obj[field]);
 
-        const point = data_mgr.class_name.indexOf('.');
-        const md_class = data_mgr.class_name.substr(0, point);
+        const point = mgr.class_name.indexOf('.');
+        const md_class = mgr.class_name.substr(0, point);
 
         const new_field = {'ref': _obj[field]};
         new_field._mixin(field_obj, (md_class == 'doc') ? ['number_doc', 'date'] : ['id', 'name'], []);
@@ -405,16 +391,16 @@ module.exports = function prm_post($p, log, rlog) {
     }
 
     //реквизиты
-    for (const field in md.fields) {
+    for (const field in meta.fields) {
       if (obj[field]) {
-        get_new_field(obj, field, md.fields[field].type);
+        get_new_field(obj, field, meta.fields[field].type);
       }
     }
 
     //табличные части
-    for (const ts in md.tabular_sections) {
+    for (const ts in meta.tabular_sections) {
       if (obj[ts]) {
-        const fields = md.tabular_sections[ts].fields;
+        const fields = meta.tabular_sections[ts].fields;
 
         obj[ts].forEach((row) => {
           //реквизиты табличных частей
@@ -430,56 +416,63 @@ module.exports = function prm_post($p, log, rlog) {
   }
 
   // возаращает конкретный документ по ссылке
-  async function doc(ctx, next) {
+  async function doc(req, res) {
+    const {parsed: {paths}, user, headers} = req;
+    const ref = (paths[2] || '').toLowerCase();
+    const {couch_local, zone} = job_prm;
+    const suffix = user.branch.suffix || '0000';
+    const mgr = md.mgr_by_class_name(paths[1]);
+    const meta = mgr.metadata();
 
-    const {_query, params, _auth} = ctx;
-    const ref = (params.ref || '').toLowerCase();
-    const {couch_local, zone} = $p.job_prm;
+    const result = {docs: []};
 
-    const data_mgr = $p.md.mgr_by_class_name(params.class);
-    const md = data_mgr.metadata();
-    const res = {docs: []};
-
-    if(md.cachable == 'doc'){
-      const pouch = new $p.classes.PouchDB(couch_local + zone + '_doc_' + _auth.suffix, {
-        auth: {
-          username: _auth.username,
-          password: _auth.pass
+    if(meta.cachable == 'doc'){
+      const pouch = new PouchDB(couch_local + zone + '_doc_' + suffix, {
+        fetch (url, opts) {
+          if(!opts.headers) {
+            opts.headers = {};
+          }
+          opts.headers.authorization = headers.authorization;
+          return PouchDB.fetch(url, opts);
         },
         skip_setup: true
       });
 
-      const obj = await pouch.get(params.class + '|' + ref);
-      res.docs.push(obj);
+      const obj = await pouch.get(paths[1] + '|' + ref);
+      result.docs.push(obj);
+      pouch.close();
     }
     else{
-      const obj = data_mgr.get(ref);
-      res.docs.push(obj);
+      result.docs.push(_clone(mgr.get(ref)._obj));
     }
 
-    representation(res.docs[0], md);
+    representation(res.docs[0], meta);
 
-    ctx.body = res;
+    res.end(JSON.stringify(result));
   }
 
-  return async (ctx, next) => {
+  return async (req, res) => {
 
     const {path, paths} = req.parsed;
 
+    if(!req.body) {
+      req.body = JSON.parse(await utils.getBody(req));
+    }
+
     switch (paths[1]) {
     case 'doc.calc_order':
-      return await calc_order(ctx, next);
+      return await order(req, res);
     case 'array':
-      return await array(ctx, next);
+      return await array(req, res);
     case 'delivery':
-      return await delivery(ctx, next);
+      return await delivery(req, res);
     case 'store':
-      return await store(ctx, next);
+      return await store(req, res);
     case 'docs':
-      return await docs(ctx, next);
+      return await docs(req, res);
     default:
-      if(/(doc|cat|cch)\./.test(ctx.params.class)){
-        return await doc(ctx, next);
+      if(/(doc|cat|cch)\./.test(paths[1])){
+        return await doc(req, res);
       }
       utils.end.end404(res, path);
     }

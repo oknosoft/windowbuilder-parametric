@@ -59,6 +59,7 @@ module.exports = function prm_log($p, log) {
         log_data.post_data = req.body;
 
         // передаём управление основной задаче
+        res.setHeader('Content-Type', 'application/json; charset=utf-8');
         await next(req, res);
 
         // по завершению, записываем лог

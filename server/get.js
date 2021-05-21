@@ -1,20 +1,24 @@
 
-module.exports = function prm_get($p, log, rlog) {
+module.exports = function prm_get($p, log) {
 
   const {cat, utils, job_prm, adapters: {pouch}} = $p;
 
-  function serialize_prod({o, prod, ctx}) {
+  function serialize_prod({o, prod = [], res}) {
     const flds = ['margin', 'price_internal', 'amount_internal', 'marginality', 'first_cost', 'discount', 'discount_percent',
       'discount_percent_internal', 'changed', 'ordn', 'characteristic', 'qty'];
     // человекочитаемая информация в табчасть продукции
     for(let row of o._obj.production){
-      const ox = cat.characteristics.get(row.characteristic);
+      const ox = cat.characteristics.by_ref[row.characteristic];
       const nom = cat.nom.get(row.nom);
       if(ox){
         row.clr = ox.clr ? ox.clr.ref : '';
         row.clr_name = ox.clr ? ox.clr.name : '';
-        if(!ox.origin.empty()){
+        if(ox.origin && !ox.origin.empty()){
           row.nom = ox.origin.ref;
+        }
+
+        if(ox.calc_order == o && !prod.includes(ox)) {
+          prod.push(ox);
         }
       }
       else{
@@ -47,38 +51,33 @@ module.exports = function prm_get($p, log, rlog) {
       }
     });
     // тело ответа
-    ctx.body = JSON.stringify(o);
-    prod && prod.forEach((cx) => {
+    res.end(JSON.stringify(o._obj));
+
+    // выгружаем продукцию
+    prod.forEach((cx) => {
       if (!cx.empty() && !cx.is_new() && !cx.calc_order.empty()) {
         cx.unload();
       }
     });
   }
 
-  module.exports.serialize_prod = serialize_prod;
-
   // формирует json описания продукции заказа
-  async function calc_order(ctx, next) {
+  async function calc_order(req, res) {
 
-    const ref = (ctx.params.ref || '').toLowerCase();
-    const o = await $p.doc.calc_order.get(ref, 'promise');
+    const ref = (req.parsed.paths[2] || '').toLowerCase();
+    const o = await $p.doc.calc_order.get(ref).load();
 
     if(o.is_new()){
-      ctx.status = 404;
-      ctx.body = {
-        ref,
-        production: [],
-        error: true,
-        message: `Заказ с идентификатором '${ref}' не существует`,
-      };
+      utils.end.end500({res, err: {status: 404, message: `Заказ с идентификатором '${ref}' не существует`}, log});
     }
     else{
-      const prod = await o.load_production();
-      serialize_prod({o, prod, ctx});
+      const prod = await o.load_production(true);
+      serialize_prod({o, prod, res});
     }
     o.unload();
   }
 
+  // читает сохраненный объект
   async function store(req, res) {
     // данные авторизации получаем из контекста
     const {parsed: {paths}, user} = req;
@@ -90,7 +89,7 @@ module.exports = function prm_get($p, log, rlog) {
     res.end(JSON.stringify(result));
   }
 
-
+  // читает лог за указанную дату
   async function get_log(req, res) {
     const {parsed: {paths}, user} = req;
     const ref = (paths[2] || '').toLowerCase();
@@ -101,6 +100,7 @@ module.exports = function prm_get($p, log, rlog) {
     res.end(JSON.stringify(result));
   }
 
+  // читает справочники
   async function catalogs(req, res) {
 
     const predefined_names = ['БезЦвета', 'Белый'];
@@ -194,13 +194,12 @@ module.exports = function prm_get($p, log, rlog) {
   }
 
   // формирует json описания продукций массива заказов
-  async function array(ctx, next) {
-
-    ctx.body = `Prefix: ${ctx.route.prefix}, path: ${ctx.route.path}`;
-    //ctx.body = res;
+  async function array(req, res) {
+    res.end(JSON.stringify({ok: true, message: 'method "array" not implemented'}));
   }
 
-  return async (req, res) => {
+  // router запроса
+  async function router(req, res) {
 
     const {path, paths} = req.parsed;
 
@@ -218,8 +217,11 @@ module.exports = function prm_get($p, log, rlog) {
     default:
       utils.end.end404(res, path);
     }
+  }
 
-  };
+  router.serialize_prod = serialize_prod;
+
+  return router;
 
 }
 
