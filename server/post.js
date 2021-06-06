@@ -11,113 +11,108 @@ module.exports = function prm_post($p, log, serialize_prod) {
     const result = {ref, production: []};
     const {contracts, nom, inserts, clrs} = cat;
 
-    try {
-      if(!utils.is_guid(result.ref)){
-        utils.end.end500({res, err: {status: 404, message: `Параметр запроса ref=${result.ref} не соответствует маске уникального идентификатора`}, log});
-        return;
-      }
-
-      const o = await calc_order.get(ref).load();
-      const dp = buyers_order.create();
-      dp.calc_order = o;
-
-      let prod;
-      if(o.is_new()) {
-        await o.after_create(req.user);
-      }
-      else {
-        if(o.posted) {
-          utils.end.end500({res, err: {status: 403, message: `Запрещено изменять проведенный заказ ${result.ref}`}, log});
-          return o.unload();
-        }
-        if(o.obj_delivery_state == 'Отправлен' && body.obj_delivery_state != 'Отозван') {
-          utils.end.end500({res, err: {status: 403, message: `Запрещено изменять отправленный заказ ${result.ref} - его сначала нужно отозвать`}, log});
-          return o.unload();
-        }
-        prod = await o.load_production();
-        o.production.clear();
-      }
-
-      // включаем режим загрузки, чтобы в пустую не выполнять обработчики при изменении реквизитов
-      o._data._loading = true;
-
-      // заполняем шапку заказа
-      o.date = utils.moment(body.date).toDate();
-      o.number_internal = body.number_doc;
-      if(body.note){
-        o.note = body.note;
-      }
-      o.obj_delivery_state = 'Черновик';
-      if(body.partner) {
-        o.partner = body.partner;
-      }
-      if(o.contract.empty() || body.partner) {
-        o.contract = contracts.by_partner_and_org(o.partner, o.organization);
-      }
-      o.vat_consider = o.vat_included = true;
-
-      // допреквизиты: бежим структуре входного параметра, если свойства нет в реквизитах, проверяем доп
-      for(const fld in body) {
-        if(o._metadata(fld)){
-          continue;
-        }
-        const property = job_prm.properties[fld];
-        if(property && !property.empty()){
-          const {type} = property;
-          let finded;
-          let value = body[fld];
-          if(type.date_part) {
-            value = utils.fix_date(value, !type.hasOwnProperty('str_len'));
-          }
-          else if(type.digits) {
-            value = utils.fix_number(value, !type.hasOwnProperty('str_len'));
-          }
-          else if(type.types[0] == 'boolean') {
-            value = utils.fix_boolean(value);
-          }
-          o.extra_fields.find_rows({property}, (row) => {
-            row.value = value;
-            finded = true;
-            return false;
-          });
-          if(!finded){
-            o.extra_fields.add({property, value});
-          }
-        }
-      }
-
-      // подготавливаем массив продукций
-      for (let row of body.production) {
-        if(!nom.by_ref[row.nom] || nom.by_ref[row.nom].is_new()) {
-          if(!inserts.by_ref[row.nom] || inserts.by_ref[row.nom].is_new()) {
-            utils.end.end500({res, err: {status: 404, message: `Не найдена номенклатура или вставка ${row.nom}`}, log});
-            return o.unload();
-          }
-          row.inset = row.nom;
-          delete row.nom;
-        }
-        if(row.clr && row.clr != utils.blank.guid && !clrs.by_ref[row.clr]) {
-          utils.end.end500({res, err: {status: 404, message: `Не найден цвет ${row.clr}`}, log});
-          return o.unload();
-        }
-        const prow = dp.production.add(row);
-      }
-
-      // добавляем строки продукций и материалов
-      const ax = await o.process_add_product_list(dp);
-      await Promise.all(ax);
-      o.obj_delivery_state = body.obj_delivery_state == 'Отозван' ? 'Отозван' : (body.obj_delivery_state == 'Черновик' ? 'Черновик' : 'Отправлен');
-
-      // записываем
-      await o.save();
-
-      // формируем ответ
-      serialize_prod({o, prod, res});
-      o.unload();
+    if(!utils.is_guid(result.ref)){
+      utils.end.end500({res, err: {status: 404, message: `Параметр запроса ref=${result.ref} не соответствует маске уникального идентификатора`}, log});
+      return;
     }
-    catch (err) {
-      utils.end.end500({res, err, log});
+
+    const o = await calc_order.get(ref).load();
+    const dp = buyers_order.create();
+    dp.calc_order = o;
+
+    let prod;
+    if(o.is_new()) {
+      await o.after_create(req.user);
     }
+    else {
+      if(o.posted) {
+        utils.end.end500({res, err: {status: 403, message: `Запрещено изменять проведенный заказ ${result.ref}`}, log});
+        return o.unload();
+      }
+      if(o.obj_delivery_state == 'Отправлен' && body.obj_delivery_state != 'Отозван') {
+        utils.end.end500({res, err: {status: 403, message: `Запрещено изменять отправленный заказ ${result.ref} - его сначала нужно отозвать`}, log});
+        return o.unload();
+      }
+      prod = await o.load_production();
+      o.production.clear();
+    }
+
+    // включаем режим загрузки, чтобы в пустую не выполнять обработчики при изменении реквизитов
+    o._data._loading = true;
+
+    // заполняем шапку заказа
+    o.date = utils.moment(body.date).toDate();
+    o.number_internal = body.number_doc;
+    if(body.note){
+      o.note = body.note;
+    }
+    o.obj_delivery_state = 'Черновик';
+    if(body.partner) {
+      o.partner = body.partner;
+    }
+    if(o.contract.empty() || body.partner) {
+      o.contract = contracts.by_partner_and_org(o.partner, o.organization);
+    }
+    o.vat_consider = o.vat_included = true;
+
+    // допреквизиты: бежим структуре входного параметра, если свойства нет в реквизитах, проверяем доп
+    for(const fld in body) {
+      if(o._metadata(fld)){
+        continue;
+      }
+      const property = job_prm.properties[fld];
+      if(property && !property.empty()){
+        const {type} = property;
+        let finded;
+        let value = body[fld];
+        if(type.date_part) {
+          value = utils.fix_date(value, !type.hasOwnProperty('str_len'));
+        }
+        else if(type.digits) {
+          value = utils.fix_number(value, !type.hasOwnProperty('str_len'));
+        }
+        else if(type.types[0] == 'boolean') {
+          value = utils.fix_boolean(value);
+        }
+        o.extra_fields.find_rows({property}, (row) => {
+          row.value = value;
+          finded = true;
+          return false;
+        });
+        if(!finded){
+          o.extra_fields.add({property, value});
+        }
+      }
+    }
+
+    // подготавливаем массив продукций
+    for (let row of body.production) {
+      if(!nom.by_ref[row.nom] || nom.by_ref[row.nom].is_new()) {
+        if(!inserts.by_ref[row.nom] || inserts.by_ref[row.nom].is_new()) {
+          utils.end.end500({res, err: {status: 404, message: `Не найдена номенклатура или вставка ${row.nom}`}, log});
+          return o.unload();
+        }
+        row.inset = row.nom;
+        delete row.nom;
+      }
+      if(row.clr && row.clr != utils.blank.guid && !clrs.by_ref[row.clr]) {
+        utils.end.end500({res, err: {status: 404, message: `Не найден цвет ${row.clr}`}, log});
+        return o.unload();
+      }
+      dp.production.add(row);
+    }
+
+    // добавляем строки продукций и материалов
+    const ax = await o.process_add_product_list(dp);
+    await Promise.all(ax);
+    o.obj_delivery_state = body.obj_delivery_state == 'Отозван' ? 'Отозван' : (body.obj_delivery_state == 'Черновик' ? 'Черновик' : 'Отправлен');
+
+    // записываем
+    await o.save();
+
+    // формируем ответ
+    serialize_prod({o, prod, res});
+    o.unload();
 
   }
 
@@ -130,121 +125,109 @@ module.exports = function prm_post($p, log, serialize_prod) {
   // перезаполняет даты и время партий доставки
   async function delivery(req, res) {
 
-    const {_query, _auth} = ctx;
-    if(!Array.isArray(_query)) {
-      ctx.status = 403;
-      ctx.body = {
-        error: true,
-        message: `Тело запроса должно содержать массив`,
-      };
-      return;
+    const {body} = req;
+
+    if(!Array.isArray(body)) {
+      return utils.end.end500({
+        res,
+        err: {status: 403, message: `Тело запроса должно содержать массив`},
+        log});
     }
-    if(!_query.length) {
-      ctx.status = 403;
-      ctx.body = {
-        error: true,
-        message: `Пустой массив запроса`,
-      };
-      return;
+    if(!body.length) {
+      return utils.end.end500({
+        res,
+        err: {status: 403, message: `Пустой массив запроса`},
+        log});
     }
-    if(_query.length > 50) {
-      ctx.status = 403;
-      ctx.body = {
-        error: true,
-        message: `За один запрос можно обработать не более 50 заказов`,
-      };
-      return;
+    if(body.length > 50) {
+      return utils.end.end500({
+        res,
+        err: {status: 403, message: `За один запрос можно обработать не более 50 заказов`},
+        log});
     }
 
-    try {
-      const {delivery_order, delivery_date, delivery_time} = job_prm.properties;
-      const props = {delivery_order, delivery_date, delivery_time};
-      const orders = [];
-      const keys = _query.map((obj) => `doc.calc_order|${obj.ref}`);
-      const docs = await pouch.remote.doc.allDocs({keys, limit: keys.length, include_docs: true});
+    const {delivery_order, delivery_date, delivery_time} = job_prm.properties;
+    const props = {delivery_order, delivery_date, delivery_time};
+    const orders = [];
+    const keys = body.map((obj) => `doc.calc_order|${obj.ref}`);
+    const docs = await pouch.remote.doc.allDocs({keys, limit: keys.length, include_docs: true});
 
-      for(const {doc} of docs.rows) {
-        if(doc) {
-          let modified;
-          const ref = doc._id.substr(15);
-          const set = _query.reduce((sum, val) => {
-            if(sum) {
-              return sum;
-            }
-            if(val.ref === ref) {
-              return val;
-            }
-          }, null);
-
-          // обновляем табчасть extra_fields
-          if(!doc.extra_fields) {
-            doc.extra_fields = [];
+    for(const {doc} of docs.rows) {
+      if(doc) {
+        let modified;
+        const ref = doc._id.substr(15);
+        const set = body.reduce((sum, val) => {
+          if(sum) {
+            return sum;
           }
-          doc.extra_fields.forEach((row) => {
-            if(row.Свойство) {
-              row.property = row.Свойство;
-              delete row.Свойство;
-            }
-            if(row.Значение) {
-              row.value = row.Значение;
-              delete row.Значение;
-            }
-          });
-          for(const name in set) {
-            const prop = props[`delivery_${name}`];
-            if(!prop) {
-              continue;
-            }
-            const {type} = prop;
-            let value = set[name];
-            if(type.date_part) {
-              value = utils.fix_date(value, !type.hasOwnProperty('str_len'));
-            }
-            else if(type.digits) {
-              value = utils.fix_number(value, !type.hasOwnProperty('str_len'));
-            }
-            else if(type.types[0] == 'boolean') {
-              value = utils.fix_boolean(value);
-            }
-            if(!doc.extra_fields.some((row) => {
-              if(row.property == prop) {
-                if(row.value !== value) {
-                  modified = true;
-                  row.value = value;
-                }
-                return true;
+          if(val.ref === ref) {
+            return val;
+          }
+        }, null);
+
+        // обновляем табчасть extra_fields
+        if(!doc.extra_fields) {
+          doc.extra_fields = [];
+        }
+        doc.extra_fields.forEach((row) => {
+          if(row.Свойство) {
+            row.property = row.Свойство;
+            delete row.Свойство;
+          }
+          if(row.Значение) {
+            row.value = row.Значение;
+            delete row.Значение;
+          }
+        });
+        for(const name in set) {
+          const prop = props[`delivery_${name}`];
+          if(!prop) {
+            continue;
+          }
+          const {type} = prop;
+          let value = set[name];
+          if(type.date_part) {
+            value = utils.fix_date(value, !type.hasOwnProperty('str_len'));
+          }
+          else if(type.digits) {
+            value = utils.fix_number(value, !type.hasOwnProperty('str_len'));
+          }
+          else if(type.types[0] == 'boolean') {
+            value = utils.fix_boolean(value);
+          }
+          if(!doc.extra_fields.some((row) => {
+            if(row.property == prop) {
+              if(row.value !== value) {
+                modified = true;
+                row.value = value;
               }
-            })) {
-              doc.extra_fields.push({property: prop.ref, value});
+              return true;
             }
-          }
-
-          set.number_doc = doc.number_doc;
-
-          // если изменено, складываем для записи
-          if(modified) {
-            doc.timestamp = {
-              user: _auth.username,
-              moment: utils.moment().format('YYYY-MM-DDTHH:mm:ss ZZ'),
-            };
-            orders.push(doc);
+          })) {
+            doc.extra_fields.push({property: prop.ref, value});
           }
         }
+
+        set.number_doc = doc.number_doc;
+
+        // если изменено, складываем для записи
+        if(modified) {
+          doc.timestamp = {
+            user: req.user.name,
+            moment: utils.moment().format('YYYY-MM-DDTHH:mm:ss ZZ'),
+          };
+          orders.push(doc);
+        }
       }
-
-      // если есть, что записывать - записываем
-      if(orders.length) {
-        await pouch.remote.doc.bulkDocs(orders);
-      }
-
-      ctx.body = _query;
-
     }
-    catch (err) {
-      ctx.status = 500;
-      ctx.body = err ? (err.stack || err.message) : `Ошибка при групповой установке дат доставки`;
-      debug(err);
+
+    // если есть, что записывать - записываем
+    if(orders.length) {
+      await pouch.remote.doc.bulkDocs(orders);
     }
+
+    // тело ответа
+    res.end(JSON.stringify(body));
 
   }
 
@@ -262,7 +245,7 @@ module.exports = function prm_post($p, log, serialize_prod) {
       }
       body._id = `_local/store.${suffix}.${ref}`;
       const result = await pouch.remote.doc.get(body._id)
-        .catch((err) => null)
+        .catch(() => null)
         .then((rev) => {
           if(rev){
             body._rev = rev._rev;
@@ -276,7 +259,8 @@ module.exports = function prm_post($p, log, serialize_prod) {
   // возвращает список документов
   async function docs(req, res) {
 
-    const {parsed: {paths}, user, headers, body} = req;
+    const {user, headers, body} = req;
+    const {suffix} = user.branch;
     const {selector} = body;
     const {couch_local, zone} = job_prm;
 
@@ -292,9 +276,10 @@ module.exports = function prm_post($p, log, serialize_prod) {
     const meta = mgr.metadata();
 
     //Работаем только с данными, кешируемыми в doc, для остального есть отдельный endpoint
+    let result = {docs: []};
     if(meta.cachable == 'doc') {
       //Сразу соединяемся с pouch базы партнера, чтобы брать данные из нее
-      const pouch = new PouchDB(couch_local + zone + '_doc_' + _auth.suffix, {
+      const pouch = new PouchDB(couch_local + zone + `_doc${suffix ? '_' + suffix : ''}`, {
         fetch (url, opts) {
           if(!opts.headers) {
             opts.headers = {};
@@ -306,7 +291,6 @@ module.exports = function prm_post($p, log, serialize_prod) {
       });
 
       //Если в селекторе есть _id, то запрошен перечень конкретных ссылок, и mango query не нужен
-      let result = {docs: []};
       if ('_id' in selector) {
         const keys = [];
 
@@ -319,7 +303,7 @@ module.exports = function prm_post($p, log, serialize_prod) {
           keys.push(class_name + '|' + selector._id);
         }
 
-        tmp = await pouch.allDocs({include_docs: true, inclusive_end: true, keys});
+        const tmp = await pouch.allDocs({include_docs: true, inclusive_end: true, keys});
         result.docs = tmp.rows;
 
       }
@@ -355,9 +339,9 @@ module.exports = function prm_post($p, log, serialize_prod) {
           }
         }
 
-        _query.selector = _s;
+        body.selector = _s;
 
-        result = await pouch.find(_query);
+        result = await pouch.find(body);
 
       }
       pouch.close();
