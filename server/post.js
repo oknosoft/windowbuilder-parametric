@@ -6,113 +6,134 @@ module.exports = function prm_post($p, log, serialize_prod) {
   // формирует json описания продукции заказа
   async function order(req, res) {
 
-    const {parsed: {paths}, body} = req;
+    const {parsed: {paths}, body, user} = req;
     const ref = (paths[2] || '').toLowerCase();
     const result = {ref, production: []};
     const {contracts, nom, inserts, clrs} = cat;
 
     if(!utils.is_guid(result.ref)){
-      utils.end.end500({res, err: {status: 404, message: `Параметр запроса ref=${result.ref} не соответствует маске уникального идентификатора`}, log});
+      utils.end.end500({res, err: {
+        status: 404,
+        message: `Параметр запроса ref=${result.ref} не соответствует маске уникального идентификатора, suffix: '${user.branch.suffix}'`
+        }, log});
       return;
     }
 
-    const o = await calc_order.get(ref).load();
-    const dp = buyers_order.create();
-    dp.calc_order = o;
+    let o;
+    try {
+      o = await calc_order.get(ref).load();
+      const dp = buyers_order.create();
+      dp.calc_order = o;
 
-    let prod;
-    if(o.is_new()) {
-      await o.after_create(req.user);
-    }
-    else {
-      if(o.posted) {
-        utils.end.end500({res, err: {status: 403, message: `Запрещено изменять проведенный заказ ${result.ref}`}, log});
-        return o.unload();
+      let prod;
+      if(o.is_new() || o.manager !== user) {
+        await o.after_create(user);
       }
-      if(o.obj_delivery_state == 'Отправлен' && body.obj_delivery_state != 'Отозван') {
-        utils.end.end500({res, err: {status: 403, message: `Запрещено изменять отправленный заказ ${result.ref} - его сначала нужно отозвать`}, log});
-        return o.unload();
-      }
-      prod = await o.load_production();
-      o.production.clear();
-    }
-
-    // включаем режим загрузки, чтобы в пустую не выполнять обработчики при изменении реквизитов
-    o._data._loading = true;
-
-    // заполняем шапку заказа
-    o.date = utils.moment(body.date).toDate();
-    o.number_internal = body.number_doc;
-    if(body.note){
-      o.note = body.note;
-    }
-    o.obj_delivery_state = 'Черновик';
-    if(body.partner) {
-      o.partner = body.partner;
-    }
-    if(o.contract.empty() || body.partner) {
-      o.contract = contracts.by_partner_and_org(o.partner, o.organization);
-    }
-    o.vat_consider = o.vat_included = true;
-
-    // допреквизиты: бежим структуре входного параметра, если свойства нет в реквизитах, проверяем доп
-    for(const fld in body) {
-      if(o._metadata(fld)){
-        continue;
-      }
-      const property = job_prm.properties[fld];
-      if(property && !property.empty()){
-        const {type} = property;
-        let finded;
-        let value = body[fld];
-        if(type.date_part) {
-          value = utils.fix_date(value, !type.hasOwnProperty('str_len'));
-        }
-        else if(type.digits) {
-          value = utils.fix_number(value, !type.hasOwnProperty('str_len'));
-        }
-        else if(type.types[0] == 'boolean') {
-          value = utils.fix_boolean(value);
-        }
-        o.extra_fields.find_rows({property}, (row) => {
-          row.value = value;
-          finded = true;
-          return false;
-        });
-        if(!finded){
-          o.extra_fields.add({property, value});
-        }
-      }
-    }
-
-    // подготавливаем массив продукций
-    for (let row of body.production) {
-      if(!nom.by_ref[row.nom] || nom.by_ref[row.nom].is_new()) {
-        if(!inserts.by_ref[row.nom] || inserts.by_ref[row.nom].is_new()) {
-          utils.end.end500({res, err: {status: 404, message: `Не найдена номенклатура или вставка ${row.nom}`}, log});
+      else {
+        if(o.posted) {
+          utils.end.end500({res, err: {
+              status: 403,
+              message: `Запрещено изменять проведенный заказ ${result.ref}, suffix: '${user.branch.suffix}'`
+            }, log});
           return o.unload();
         }
-        row.inset = row.nom;
-        delete row.nom;
+        if(o.obj_delivery_state == 'Отправлен' && body.obj_delivery_state != 'Отозван') {
+          utils.end.end500({res, err: {
+              status: 403,
+              message: `Запрещено изменять отправленный заказ ${result.ref} - его сначала нужно отозвать, suffix: '${user.branch.suffix}'`
+            }, log});
+          return o.unload();
+        }
+        prod = await o.load_production();
+        o.production.clear();
       }
-      if(row.clr && row.clr != utils.blank.guid && !clrs.by_ref[row.clr]) {
-        utils.end.end500({res, err: {status: 404, message: `Не найден цвет ${row.clr}`}, log});
-        return o.unload();
+
+      // включаем режим загрузки, чтобы в пустую не выполнять обработчики при изменении реквизитов
+      o._data._loading = true;
+
+      // заполняем шапку заказа
+      o.date = utils.moment(body.date).toDate();
+      o.number_internal = body.number_doc;
+      if(body.note){
+        o.note = body.note;
       }
-      dp.production.add(row);
+      o.obj_delivery_state = 'Черновик';
+      if(body.partner) {
+        o.partner = body.partner;
+      }
+      if(o.contract.empty() || body.partner) {
+        o.contract = contracts.by_partner_and_org(o.partner, o.organization);
+      }
+      o.vat_consider = o.vat_included = true;
+
+      // допреквизиты: бежим структуре входного параметра, если свойства нет в реквизитах, проверяем доп
+      for(const fld in body) {
+        if(o._metadata(fld)){
+          continue;
+        }
+        const property = job_prm.properties[fld];
+        if(property && !property.empty()){
+          const {type} = property;
+          let finded;
+          let value = body[fld];
+          if(type.date_part) {
+            value = utils.fix_date(value, !type.hasOwnProperty('str_len'));
+          }
+          else if(type.digits) {
+            value = utils.fix_number(value, !type.hasOwnProperty('str_len'));
+          }
+          else if(type.types[0] == 'boolean') {
+            value = utils.fix_boolean(value);
+          }
+          o.extra_fields.find_rows({property}, (row) => {
+            row.value = value;
+            finded = true;
+            return false;
+          });
+          if(!finded){
+            o.extra_fields.add({property, value});
+          }
+        }
+      }
+
+      // подготавливаем массив продукций
+      for (let row of body.production) {
+        if(!nom.by_ref[row.nom] || nom.by_ref[row.nom].is_new()) {
+          if(!inserts.by_ref[row.nom] || inserts.by_ref[row.nom].is_new()) {
+            utils.end.end500({res, err: {
+                status: 404,
+                message: `Не найдена номенклатура или вставка ${row.nom}, suffix: '${user.branch.suffix}'`}, log});
+            return o.unload();
+          }
+          row.inset = row.nom;
+          delete row.nom;
+        }
+        if(row.clr && row.clr != utils.blank.guid && !clrs.by_ref[row.clr]) {
+          utils.end.end500({res, err: {
+              status: 404,
+              message: `Не найден цвет ${row.clr}, suffix: '${user.branch.suffix}'`}, log});
+          return o.unload();
+        }
+        dp.production.add(row);
+      }
+
+      // добавляем строки продукций и материалов
+      const ax = await o.process_add_product_list(dp);
+      await Promise.all(ax);
+      o.obj_delivery_state = body.obj_delivery_state == 'Отозван' ? 'Отозван' : (body.obj_delivery_state == 'Черновик' ? 'Черновик' : 'Отправлен');
+
+      // записываем
+      await o.save();
+
+      // формируем ответ
+      const response = serialize_prod({o, prod, res});
+      o.unload();
+      return response;
     }
-
-    // добавляем строки продукций и материалов
-    const ax = await o.process_add_product_list(dp);
-    await Promise.all(ax);
-    o.obj_delivery_state = body.obj_delivery_state == 'Отозван' ? 'Отозван' : (body.obj_delivery_state == 'Черновик' ? 'Черновик' : 'Отправлен');
-
-    // записываем
-    await o.save();
-
-    // формируем ответ
-    serialize_prod({o, prod, res});
-    o.unload();
+    catch (err) {
+      o && o.unload();
+      throw err;
+    }
 
   }
 
@@ -125,24 +146,24 @@ module.exports = function prm_post($p, log, serialize_prod) {
   // перезаполняет даты и время партий доставки
   async function delivery(req, res) {
 
-    const {body} = req;
+    const {body, user} = req;
 
     if(!Array.isArray(body)) {
       return utils.end.end500({
         res,
-        err: {status: 403, message: `Тело запроса должно содержать массив`},
+        err: {status: 403, message: `Тело запроса должно содержать массив, suffix: '${user.branch.suffix}'`},
         log});
     }
     if(!body.length) {
       return utils.end.end500({
         res,
-        err: {status: 403, message: `Пустой массив запроса`},
+        err: {status: 403, message: `Пустой массив запроса, suffix: '${user.branch.suffix}'`},
         log});
     }
     if(body.length > 50) {
       return utils.end.end500({
         res,
-        err: {status: 403, message: `За один запрос можно обработать не более 50 заказов`},
+        err: {status: 403, message: `За один запрос можно обработать не более 50 заказов, suffix: '${user.branch.suffix}'`},
         log});
     }
 
@@ -227,7 +248,9 @@ module.exports = function prm_post($p, log, serialize_prod) {
     }
 
     // тело ответа
-    res.end(JSON.stringify(body));
+    const response = JSON.stringify(body);
+    res.end(response);
+    return response;
 
   }
 
@@ -267,7 +290,7 @@ module.exports = function prm_post($p, log, serialize_prod) {
     //class__name (имя класса) должен быть всегда
     const {class_name} = selector || {};
     if (!class_name) {
-      return utils.end.end500({res, err: {status: 404, message: `Не указан класс объектов в селекторе`}, log});
+      return utils.end.end500({res, err: {status: 404, message: `Не указан класс объектов в селекторе, suffix: '${suffix}'`}, log});
     }
 
     const point = class_name.indexOf('.');
@@ -438,10 +461,6 @@ module.exports = function prm_post($p, log, serialize_prod) {
   return async (req, res) => {
 
     const {path, paths} = req.parsed;
-
-    if(!req.body) {
-      req.body = JSON.parse(await utils.getBody(req));
-    }
 
     switch (paths[1]) {
     case 'doc.calc_order':

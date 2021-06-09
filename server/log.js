@@ -1,7 +1,7 @@
 
 module.exports = function prm_log($p, log) {
 
-  const {utils} = $p;
+  const {moment, end, getBody} = $p.utils;
   const sessions = {};
 
   async function saveLog({_id, log, start, body}) {
@@ -30,7 +30,6 @@ module.exports = function prm_log($p, log) {
   return async (req, res, next) => {
 
     // request
-    const {moment} = $p.utils;
     const start = moment();
     const suffix = req.user.branch.suffix || '0000';
     const _id = `_local/log.${suffix}.${start.format('YYYYMMDD')}`;
@@ -48,22 +47,25 @@ module.exports = function prm_log($p, log) {
     try {
 
       // проверяем и устанавливаем сессию
-      if(sessions.hasOwnProperty(suffix) && Date.now() - sessions[suffix] < 6000) {
+      if(req.method !== 'GET' && sessions.hasOwnProperty(suffix) && Date.now() - sessions[suffix] < 6000) {
         await saveLog({_id, log: log_data, start, body: req.body});
-        utils.end.end500({res, err: {status: 403, message: 'flood: concurrent requests'}, log});
+        end.end500({res, err: {status: 429, message: `flood: concurrent requests, suffix: '${suffix}'`}, log});
       }
       else {
         sessions[suffix] = Date.now();
 
-        // тело запроса анализируем только для авторизованных пользователей
+        // тело запроса
+        if(!req.body && req.method !== 'GET') {
+          req.body = JSON.parse(await getBody(req));
+        }
         log_data.post_data = req.body;
 
         // передаём управление основной задаче
         res.setHeader('Content-Type', 'application/json; charset=utf-8');
-        await next(req, res);
+        const body = await next(req, res);
 
         // по завершению, записываем лог
-        await saveLog({_id, log: log_data, start, body: log_data.url.indexOf('prm/doc.calc_order') != -1 && req.body});
+        await saveLog({_id, log: log_data, start, body: log_data.url.includes('prm/doc.calc_order') && body});
 
         // сбрасываем сессию
         sessions[suffix] = 0;
@@ -72,6 +74,7 @@ module.exports = function prm_log($p, log) {
     }
     catch (err) {
       // в случае ошибки записываем лог
+      sessions[suffix] = 0;
       log_data.error = err.message;
       await saveLog({_id, log: log_data, start});
       throw err;

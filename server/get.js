@@ -1,7 +1,7 @@
 
 module.exports = function prm_get($p, log) {
 
-  const {cat, utils, job_prm, adapters: {pouch}} = $p;
+  const {cat, utils: {end, blank}, job_prm, adapters: {pouch}} = $p;
 
   function serialize_prod({o, prod = [], res}) {
     const flds = ['margin', 'price_internal', 'amount_internal', 'marginality', 'first_cost', 'discount', 'discount_percent',
@@ -51,7 +51,8 @@ module.exports = function prm_get($p, log) {
       }
     });
     // тело ответа
-    res.end(JSON.stringify(o._obj));
+    const response = JSON.stringify(o._obj);
+    res.end(response);
 
     // выгружаем продукцию
     prod.forEach((cx) => {
@@ -59,16 +60,21 @@ module.exports = function prm_get($p, log) {
         cx.unload();
       }
     });
+
+    return response;
   }
 
   // формирует json описания продукции заказа
   async function calc_order(req, res) {
 
-    const ref = (req.parsed.paths[2] || '').toLowerCase();
+    let {parsed: {paths}, user} = req;
+    const {suffix} = user.branch;
+
+    const ref = (paths[2] || '').toLowerCase();
     const o = await $p.doc.calc_order.get(ref).load();
 
     if(o.is_new()){
-      utils.end.end500({res, err: {status: 404, message: `Заказ с идентификатором '${ref}' не существует`}, log});
+      end.end500({res, err: {status: 404, message: `Заказ с идентификатором '${ref}' не существует, suffix: '${suffix}'`}, log});
     }
     else{
       const prod = await o.load_production(true);
@@ -104,7 +110,7 @@ module.exports = function prm_get($p, log) {
   async function catalogs(req, res) {
 
     const predefined_names = ['БезЦвета', 'Белый'];
-    const {clrs, inserts, nom, partners, users} = cat;
+    const {clrs, inserts, nom, partners} = cat;
     const prms = new Set();
     const result = {
       // цвета
@@ -117,7 +123,7 @@ module.exports = function prm_get($p, log) {
         })),
       // номенклатура и вставки
       nom: inserts.alatable
-        .filter((o) => o.ref !== $p.utils.blank.guid)
+        .filter((o) => o.ref !== blank.guid)
         .map(({ref}) => {
           const o = inserts.get(ref);
           const mf = {};
@@ -215,7 +221,7 @@ module.exports = function prm_get($p, log) {
     case 'array':
       return await array(req, res);
     default:
-      utils.end.end404(res, path);
+      end.end404(res, path);
     }
   }
 
