@@ -56,7 +56,12 @@ module.exports = function prm_log($p, log) {
 
         // тело запроса
         if(!req.body && req.method !== 'GET') {
-          req.body = JSON.parse(await getBody(req));
+          try {
+            req.body = JSON.parse(await getBody(req));
+          }
+          catch (e) {
+            req.body = {};
+          }
         }
         log_data.post_data = req.body;
 

@@ -6,27 +6,141 @@ module.exports = function prm_post($p, log, serialize_prod) {
   // формирует json описания продукции заказа
   async function order(req, res) {
 
-    const {parsed: {paths}, body, user} = req;
+    const {parsed: {paths}, body: {action, rows, ...body}, user} = req;
     const ref = (paths[2] || '').toLowerCase();
     const result = {ref, production: []};
     const {contracts, nom, inserts, clrs} = cat;
+    let o, prod;
 
     if(!utils.is_guid(result.ref)){
       utils.end.end500({res, err: {
         status: 404,
-        message: `Параметр запроса ref=${result.ref} не соответствует маске уникального идентификатора, suffix: '${user.branch.suffix}'`
+        message: `Параметр ref=${result.ref} не соответствует маске уникального идентификатора, suffix: '${user.branch.suffix}'`
         }, log});
       return;
     }
 
-    let o;
+    // обработчики действий
+    const actions = {
+
+      // заполняет и рассчитывает заказ по массиву входящих параметров
+      async prm() {
+        o.production.clear();
+
+        // включаем режим загрузки, чтобы в пустую не выполнять обработчики при изменении реквизитов
+        o._data._loading = true;
+
+        // заполняем шапку заказа
+        o.date = utils.moment(body.date).toDate();
+        o.number_internal = body.number_doc;
+        if(body.note){
+          o.note = body.note;
+        }
+        o.obj_delivery_state = 'Черновик';
+        if(body.partner) {
+          o.partner = body.partner;
+        }
+        if(o.contract.empty() || body.partner) {
+          o.contract = contracts.by_partner_and_org(o.partner, o.organization);
+        }
+        o.vat_consider = o.vat_included = true;
+
+        // допреквизиты: бежим структуре входного параметра, если свойства нет в реквизитах, проверяем доп
+        for(const fld in body) {
+          if(o._metadata(fld)){
+            continue;
+          }
+          const property = job_prm.properties[fld];
+          if(property && !property.empty()){
+            const {type} = property;
+            let finded;
+            let value = body[fld];
+            if(type.date_part) {
+              value = utils.fix_date(value, !type.hasOwnProperty('str_len'));
+            }
+            else if(type.digits) {
+              value = utils.fix_number(value, !type.hasOwnProperty('str_len'));
+            }
+            else if(type.types[0] == 'boolean') {
+              value = utils.fix_boolean(value);
+            }
+            o.extra_fields.find_rows({property}, (row) => {
+              row.value = value;
+              finded = true;
+              return false;
+            });
+            if(!finded){
+              o.extra_fields.add({property, value});
+            }
+          }
+        }
+
+        // подготавливаем массив продукций
+        for (let row of body.production) {
+          if(!nom.by_ref[row.nom] || nom.by_ref[row.nom].is_new()) {
+            if(!inserts.by_ref[row.nom] || inserts.by_ref[row.nom].is_new()) {
+              utils.end.end500({res, err: {
+                  status: 404,
+                  message: `Не найдена номенклатура или вставка ${row.nom}, suffix: '${user.branch.suffix}'`}, log});
+              return o.unload();
+            }
+            row.inset = row.nom;
+            delete row.nom;
+          }
+          if(row.clr && row.clr != utils.blank.guid && !clrs.by_ref[row.clr]) {
+            utils.end.end500({res, err: {
+                status: 404,
+                message: `Не найден цвет ${row.clr}, suffix: '${user.branch.suffix}'`}, log});
+            return o.unload();
+          }
+          dp.production.add(row);
+        }
+
+        // добавляем строки продукций и материалов
+        const ax = await o.process_add_product_list(dp);
+        await Promise.all(ax);
+        o.obj_delivery_state = body.obj_delivery_state == 'Отозван' ? 'Отозван' : (body.obj_delivery_state == 'Черновик' ? 'Черновик' : 'Отправлен');
+
+        // записываем
+        await o.save();
+
+        // формируем ответ
+        return serialize_prod({o, prod, res});
+      },
+
+      // пересчитывает спецификации и цены
+      recalc() {
+        return o.recalc({save: true})
+          .then(() => {
+            res.end(JSON.stringify(o));
+          });
+      },
+
+      // выполняет пересчет, проверки и присваивает состояние транспорта "отправлен"
+      send() {
+        throw new Error('Метод "send" не реализован');
+      },
+
+      rm_rows() {
+        if(!Array.isArray(rows)) {
+          throw new Error('Свойство "rows" должно быть массивом');
+        }
+        const rm = rows.map((rnum) => o.production.get(rnum - 1));
+        for(const row of rm) {
+          row && o.production.del(row);
+        }
+        return this.recalc();
+      },
+
+    };
+
     try {
       o = await calc_order.get(ref).load();
       const dp = buyers_order.create();
       dp.calc_order = o;
 
       let prod;
-      if(o.is_new() || o.manager !== user) {
+      if(o.is_new() || (o.manager !== user && (!action || action === 'prm'))) {
         await o.after_create(user);
       }
       else {
@@ -45,88 +159,10 @@ module.exports = function prm_post($p, log, serialize_prod) {
           return o.unload();
         }
         prod = await o.load_production();
-        o.production.clear();
       }
 
-      // включаем режим загрузки, чтобы в пустую не выполнять обработчики при изменении реквизитов
-      o._data._loading = true;
-
-      // заполняем шапку заказа
-      o.date = utils.moment(body.date).toDate();
-      o.number_internal = body.number_doc;
-      if(body.note){
-        o.note = body.note;
-      }
-      o.obj_delivery_state = 'Черновик';
-      if(body.partner) {
-        o.partner = body.partner;
-      }
-      if(o.contract.empty() || body.partner) {
-        o.contract = contracts.by_partner_and_org(o.partner, o.organization);
-      }
-      o.vat_consider = o.vat_included = true;
-
-      // допреквизиты: бежим структуре входного параметра, если свойства нет в реквизитах, проверяем доп
-      for(const fld in body) {
-        if(o._metadata(fld)){
-          continue;
-        }
-        const property = job_prm.properties[fld];
-        if(property && !property.empty()){
-          const {type} = property;
-          let finded;
-          let value = body[fld];
-          if(type.date_part) {
-            value = utils.fix_date(value, !type.hasOwnProperty('str_len'));
-          }
-          else if(type.digits) {
-            value = utils.fix_number(value, !type.hasOwnProperty('str_len'));
-          }
-          else if(type.types[0] == 'boolean') {
-            value = utils.fix_boolean(value);
-          }
-          o.extra_fields.find_rows({property}, (row) => {
-            row.value = value;
-            finded = true;
-            return false;
-          });
-          if(!finded){
-            o.extra_fields.add({property, value});
-          }
-        }
-      }
-
-      // подготавливаем массив продукций
-      for (let row of body.production) {
-        if(!nom.by_ref[row.nom] || nom.by_ref[row.nom].is_new()) {
-          if(!inserts.by_ref[row.nom] || inserts.by_ref[row.nom].is_new()) {
-            utils.end.end500({res, err: {
-                status: 404,
-                message: `Не найдена номенклатура или вставка ${row.nom}, suffix: '${user.branch.suffix}'`}, log});
-            return o.unload();
-          }
-          row.inset = row.nom;
-          delete row.nom;
-        }
-        if(row.clr && row.clr != utils.blank.guid && !clrs.by_ref[row.clr]) {
-          utils.end.end500({res, err: {
-              status: 404,
-              message: `Не найден цвет ${row.clr}, suffix: '${user.branch.suffix}'`}, log});
-          return o.unload();
-        }
-        dp.production.add(row);
-      }
-
-      // добавляем строки продукций и материалов
-      const ax = await o.process_add_product_list(dp);
-      await Promise.all(ax);
-      o.obj_delivery_state = body.obj_delivery_state == 'Отозван' ? 'Отозван' : (body.obj_delivery_state == 'Черновик' ? 'Черновик' : 'Отправлен');
-
-      // записываем
-      await o.save();
-
-      // формируем ответ
-      const response = serialize_prod({o, prod, res});
+      // формируем ответ, действие по умолчанию - классический параметрик
+      const response = await actions[action || 'prm']();
       o.unload();
       return response;
     }
