@@ -1,7 +1,7 @@
 
 module.exports = function prm_get($p, log) {
 
-  const {cat, utils: {end, blank}, job_prm, adapters: {pouch}} = $p;
+  const {cat, cch, utils: {end, blank}, job_prm, adapters: {pouch}} = $p;
 
   function serialize_prod({o, prod = [], res}) {
     const flds = ['margin', 'price_internal', 'amount_internal', 'marginality', 'first_cost', 'discount', 'discount_percent',
@@ -81,6 +81,40 @@ module.exports = function prm_get($p, log) {
       serialize_prod({o, prod, res});
     }
     o.unload();
+  }
+
+  async function properties(req, res) {
+    let {parsed: {paths}, headers} = req;
+    const branch = cat.branches.get(headers.branch);
+    const param = cch.properties.get(paths[2]);
+    if(param.empty() || param.is_new()) {
+      return end.end500({res, err: {status: 404, message: `Свойство с идентификатором '${paths[2]}' не существует.`}, log});
+    }
+    const ox = cat.characteristics.create({}, false, true);
+    ox.params.add({param: job_prm.properties.branch, value: branch});
+    const links = param.params_links({obj: {ox}});
+    const result = {
+      ref: param.ref,
+      branch: branch.ref,
+      name: param.name,
+      type: param.type,
+      links: links.map(({ref, name}) => ({ref, name})),
+    };
+    const values = [];
+    links.forEach((link) => link.append_values(values));
+    if(values.length) {
+      result.values = values.map(({value}) => value);
+    }
+    else {
+      if(param.type.types.includes('cat.property_values')) {
+        cat.property_values.find_rows({owner: param}, (value) => {
+          values.push(value);
+        });
+      }
+      result.values = values;
+    }
+    res.end(JSON.stringify(result));
+
   }
 
   // читает сохраненный объект
@@ -212,6 +246,8 @@ module.exports = function prm_get($p, log) {
     switch (paths[1]){
     case 'doc.calc_order':
       return await calc_order(req, res);
+    case 'cch.properties':
+      return await properties(req, res);
     case 'cat':
       return await catalogs(req, res);
     case 'store':
