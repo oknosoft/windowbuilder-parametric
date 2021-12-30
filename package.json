@@ -4,10 +4,6 @@
   "version": "2.1.259",
   "author": "Evgeniy Malyarov <info@oknosoft.ru> (http://www.oknosoft.ru)",
   "license": "SEE LICENSE IN LICENSE.en.md",
-  "engines": {
-    "node": "^16.13",
-    "yarn": "^1.22"
-  },
   "files": [
     "server/**",
     "LICENSE",
