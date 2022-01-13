@@ -10,6 +10,7 @@ module.exports = function prm_post($p, log, serialize_prod) {
     const ref = (paths[2] || '').toLowerCase();
     const result = {ref, production: []};
     const {contracts, nom, inserts, clrs} = cat;
+    const dp = buyers_order.create();
     let o, prod;
 
     if(!utils.is_guid(result.ref)){
@@ -136,7 +137,6 @@ module.exports = function prm_post($p, log, serialize_prod) {
 
     try {
       o = await calc_order.get(ref).load();
-      const dp = buyers_order.create();
       dp.calc_order = o;
 
       let prod;

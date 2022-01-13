@@ -3,7 +3,7 @@
   "description": "Parametric orders for windowbuilder project",
   "version": "2.1.259",
   "author": "Evgeniy Malyarov <info@oknosoft.ru> (http://www.oknosoft.ru)",
-  "license": "SEE LICENSE IN LICENSE.en.md",
+  "license": "SEE LICENSE IN LICENSE",
   "files": [
     "server/**",
     "LICENSE",
