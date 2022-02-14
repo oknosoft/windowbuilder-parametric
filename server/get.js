@@ -97,9 +97,14 @@ module.exports = function prm_get($p, log) {
       ref: param.ref,
       branch: branch.ref,
       name: param.name,
-      type: param.type,
+      type: {},
       links: links.map(({ref, name}) => ({ref, name})),
     };
+    for(const fld in param.type) {
+      if(!fld.startsWith('_')) {
+        result.type[fld] = param.type[fld];
+      }
+    }
     const values = [];
     links.forEach((link) => link.append_values(values));
     if(values.length) {
