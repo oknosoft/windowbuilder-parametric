@@ -25,7 +25,7 @@ module.exports = function prm_post($p, log, serialize_prod) {
     const actions = {
 
       // заполняет и рассчитывает заказ по массиву входящих параметров
-      async prm() {
+      async prm(attr) {
         o.production.clear();
 
         // включаем режим загрузки, чтобы в пустую не выполнять обработчики при изменении реквизитов
@@ -103,15 +103,15 @@ module.exports = function prm_post($p, log, serialize_prod) {
         o.obj_delivery_state = body.obj_delivery_state == 'Отозван' ? 'Отозван' : (body.obj_delivery_state == 'Черновик' ? 'Черновик' : 'Отправлен');
 
         // записываем
-        await o.save();
+        await o.save(undefined, undefined, undefined, attr);
 
         // формируем ответ
         return serialize_prod({o, prod, res});
       },
 
       // пересчитывает спецификации и цены
-      recalc() {
-        return o.recalc({save: true})
+      recalc(attr) {
+        return o.recalc(Object.assign({}, attr, {save: true}))
           .then(() => {
             res.end(JSON.stringify(o));
           });
@@ -122,7 +122,7 @@ module.exports = function prm_post($p, log, serialize_prod) {
         throw new Error('Метод "send" не реализован');
       },
 
-      rm_rows() {
+      rm_rows(attr) {
         if(!Array.isArray(rows)) {
           throw new Error('Свойство "rows" должно быть массивом');
         }
@@ -130,13 +130,27 @@ module.exports = function prm_post($p, log, serialize_prod) {
         for(const row of rm) {
           row && o.production.del(row);
         }
-        return this.recalc();
+        return this.recalc(attr);
       },
 
     };
 
     try {
-      o = await calc_order.get(ref).load();
+      let db = null;
+      if(body?.branch) {
+        const {auth} = pouch.remote.ram.__opts;
+        const opts = {
+          skip_setup: true,
+          auth,
+          owner: pouch,
+          fetch(url, opts) {
+            opts.headers.set('branch', body.branch);
+            return PouchDB.fetch(url, opts);
+          },
+        };
+        db = new PouchDB(`${pouch.props.path}${job_prm.zone}_doc`, opts);
+      }
+      o = await calc_order.get(ref, false, false).load({db});
       dp.calc_order = o;
 
       let prod;
@@ -158,11 +172,11 @@ module.exports = function prm_post($p, log, serialize_prod) {
             }, log});
           return o.unload();
         }
-        prod = await o.load_production();
+        prod = await o.load_production(true, db);
       }
 
       // формируем ответ, действие по умолчанию - классический параметрик
-      const response = await actions[action || 'prm']();
+      const response = await actions[action || 'prm']({db});
       o.unload();
       return response;
     }
