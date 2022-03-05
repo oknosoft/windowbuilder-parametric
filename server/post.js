@@ -6,7 +6,7 @@ module.exports = function prm_post($p, log, serialize_prod) {
   // формирует json описания продукции заказа
   async function order(req, res) {
 
-    const {parsed: {paths}, body: {action, rows, ...body}, user} = req;
+    const {parsed: {paths}, body: {action, rows, force, ...body}, user} = req;
     const ref = (paths[2] || '').toLowerCase();
     const result = {ref, production: []};
     const {contracts, nom, inserts, clrs} = cat;
@@ -158,25 +158,27 @@ module.exports = function prm_post($p, log, serialize_prod) {
         await o.after_create(user);
       }
       else {
-        if(o.posted) {
-          utils.end.end500({res, err: {
-              status: 403,
-              message: `Запрещено изменять проведенный заказ ${result.ref}, suffix: '${user.branch.suffix}'`
-            }, log});
-          return o.unload();
-        }
-        if(o.obj_delivery_state == 'Отправлен' && body.obj_delivery_state != 'Отозван') {
-          utils.end.end500({res, err: {
-              status: 403,
-              message: `Запрещено изменять отправленный заказ ${result.ref} - его сначала нужно отозвать, suffix: '${user.branch.suffix}'`
-            }, log});
-          return o.unload();
+        if(!force){
+          if(o.posted) {
+            utils.end.end500({res, err: {
+                status: 403,
+                message: `Запрещено изменять проведенный заказ ${result.ref}, suffix: '${user.branch.suffix}'`
+              }, log});
+            return o.unload();
+          }
+          if(o.obj_delivery_state == 'Отправлен' && body.obj_delivery_state != 'Отозван') {
+            utils.end.end500({res, err: {
+                status: 403,
+                message: `Запрещено изменять отправленный заказ ${result.ref} - его сначала нужно отозвать, suffix: '${user.branch.suffix}'`
+              }, log});
+            return o.unload();
+          }
         }
         prod = await o.load_production(true, db);
       }
 
       // формируем ответ, действие по умолчанию - классический параметрик
-      const response = await actions[action || 'prm']({db});
+      const response = await actions[action || 'prm']({db, force});
       o.unload();
       return response;
     }
