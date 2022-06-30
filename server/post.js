@@ -150,6 +150,7 @@ module.exports = function prm_post($p, log, serialize_prod) {
         };
         db = new PouchDB(`${pouch.props.path}${job_prm.zone}_doc`, opts);
       }
+      // get(ref, false, false) - создаёт при необходимости объект в ОЗУ, не пытается читать из базы
       o = await calc_order.get(ref, false, false).load({db});
       dp.calc_order = o;
 
