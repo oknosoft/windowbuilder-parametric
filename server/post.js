@@ -6,17 +6,27 @@ module.exports = function prm_post($p, log, serialize_prod) {
   // формирует json описания продукции заказа
   async function order(req, res) {
 
-    const {parsed: {paths}, body: {action, rows, force, ...body}, user} = req;
+    const {parsed: {paths}, body: {action, rows, force, ...body}, headers, user} = req;
     const ref = (paths[2] || '').toLowerCase();
     const result = {ref, production: []};
     const {contracts, nom, inserts, clrs} = cat;
     const dp = buyers_order.create();
     let o, prod;
 
+    // уточняем branch текущего запроса
+    let {branch} = user;
+    // если branch передан в теле или заголоках
+    const bref = body?.branch || headers.branch;
+    const req_branch = bref && cat.branches.get(bref);
+    // и текущему пользователю разрешен доступ к этому отделу
+    if(req_branch && req_branch._hierarchy(branch)) {
+      branch = req_branch;
+    }
+
     if(!utils.is_guid(result.ref)){
       utils.end.end500({res, err: {
         status: 404,
-        message: `Параметр ref=${result.ref} не соответствует маске уникального идентификатора, suffix: '${user.branch.suffix}'`
+        message: `Параметр ref=${result.ref} не соответствует маске уникального идентификатора, suffix: '${branch.suffix}'`
         }, log});
       return;
     }
@@ -136,26 +146,15 @@ module.exports = function prm_post($p, log, serialize_prod) {
     };
 
     try {
-      let db = null;
-      if(body?.branch) {
-        const {auth} = pouch.remote.ram.__opts;
-        const opts = {
-          skip_setup: true,
-          auth,
-          owner: pouch,
-          fetch(url, opts) {
-            opts.headers.set('branch', body.branch);
-            return PouchDB.fetch(url, opts);
-          },
-        };
-        db = new PouchDB(`${pouch.props.path}${job_prm.zone}_doc`, opts);
-      }
+      // база текущего отдела
+      const db = branch.empty() ? null : branch.db('doc');
       // get(ref, false, false) - создаёт при необходимости объект в ОЗУ, не пытается читать из базы
       o = await calc_order.get(ref, false, false).load({db});
       dp.calc_order = o;
 
       let prod;
       if(o.is_new() || (o.manager !== user && (!action || action === 'prm'))) {
+        // заполняем шапку заказа свойствами текущего пользователя
         await o.after_create(user);
       }
       else {
@@ -163,7 +162,7 @@ module.exports = function prm_post($p, log, serialize_prod) {
           if(o.posted) {
             utils.end.end500({res, err: {
                 status: 403,
-                message: `Запрещено изменять проведенный заказ ${result.ref}, suffix: '${user.branch.suffix}'`
+                message: `Запрещено изменять проведенный заказ ${result.ref}, suffix: '${branch.suffix}'`
               }, log});
             return o.unload();
           }
@@ -340,7 +339,7 @@ module.exports = function prm_post($p, log, serialize_prod) {
     const {selector} = body;
     const {couch_local, zone} = job_prm;
 
-    //class__name (имя класса) должен быть всегда
+    //class_name (имя класса) должен быть всегда
     const {class_name} = selector || {};
     if (!class_name) {
       return utils.end.end500({res, err: {status: 404, message: `Не указан класс объектов в селекторе, suffix: '${suffix}'`}, log});
@@ -403,14 +402,10 @@ module.exports = function prm_post($p, log, serialize_prod) {
           _s.search = {$ne: null};
         }
 
-        const predefined_keys = new Set();
-        predefined_keys.add('class_name');
-        predefined_keys.add('date');
-        predefined_keys.add('search');
-
         //Добавим в селектор остальные поля, кроме class_name, date и search
+        const predefined_keys = ['class_name', 'date', 'search'];
         for (const key in selector) {
-          if (!predefined_keys.has(key)) {
+          if (!predefined_keys.includes(key)) {
             _s[key] = selector[key];
           }
         }
