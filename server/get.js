@@ -1,7 +1,7 @@
 
 module.exports = function prm_get($p, log) {
 
-  const {cat, cch, utils: {end, blank}, job_prm, adapters: {pouch}} = $p;
+  const {cat, cch, utils: {end, blank}, job_prm, adapters: {pouch}, CatNom} = $p;
 
   function serialize_prod({o, prod = [], res}) {
     const flds = ['margin', 'price_internal', 'amount_internal', 'marginality', 'first_cost', 'discount', 'discount_percent',
@@ -83,6 +83,7 @@ module.exports = function prm_get($p, log) {
     o.unload();
   }
 
+  // формирует описание свойства
   async function properties(req, res) {
     let {parsed: {paths}, headers} = req;
     const branch = cat.branches.get(headers.branch);
@@ -120,6 +121,21 @@ module.exports = function prm_get($p, log) {
     }
     res.end(JSON.stringify(result));
 
+  }
+
+  // список используемых номенклатур
+  async function noms(req, res) {
+    const set = new Set();
+    for(const name of ['furns', 'cnns', 'inserts']) {
+      for(const {specification} of cat[name]) {
+        for(const {nom} of specification) {
+          if(nom instanceof CatNom) {
+            set.add(nom);
+          }
+        }
+      }
+    }
+    res.end(JSON.stringify(Array.from(set)));
   }
 
   // читает сохраненный объект
@@ -255,6 +271,8 @@ module.exports = function prm_get($p, log) {
       return await properties(req, res);
     case 'cat':
       return await catalogs(req, res);
+    case 'noms':
+      return await noms(req, res);
     case 'store':
       return await store(req, res);
     case 'log':
