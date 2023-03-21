@@ -176,16 +176,6 @@ endpoint `POST /prm/doc.calc_order/:ref`, поддерживает параме�
     {
       "uid": "6a43a570-b06f-11ed-bce8-83dcbc23069e",
       "quantity": 6,
-    },
-    {
-      "uid": "79669da0-b06f-11ed-bce8-83dcbc23069e",
-      "nom": "fbd744b4-85c9-11ec-9981-e64cf8971646",
-      "unit": "fbd744b5-85c9-11ec-9981-e64cf8971646",
-      "characteristic": "791410d0-b06f-11ed-bce8-83dcbc23069e",
-      "quantity": 1,
-      "extra_charge_external": 0,
-      "discount_percent": 0,
-      "discount_percent_internal": 20
     }
   ]
 }
